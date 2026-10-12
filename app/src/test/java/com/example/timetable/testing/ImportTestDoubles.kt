@@ -8,6 +8,10 @@ import com.example.timetable.domain.importer.SchoolCredentials
 import com.example.timetable.domain.importer.SchoolRegistry
 import com.example.timetable.domain.importer.SchoolSession
 import com.example.timetable.domain.importer.TimetableFetchRequest
+import com.example.timetable.domain.calendar.CalendarEventLink
+import com.example.timetable.domain.calendar.CalendarSyncOutcome
+import com.example.timetable.domain.calendar.CalendarSyncPlan
+import com.example.timetable.domain.calendar.CalendarSyncResult
 import com.example.timetable.domain.model.AppSettings
 import com.example.timetable.domain.model.Course
 import com.example.timetable.domain.model.ReminderRule
@@ -16,6 +20,7 @@ import com.example.timetable.domain.model.Semester
 import com.example.timetable.domain.model.TimeSlot
 import com.example.timetable.domain.model.Timetable
 import com.example.timetable.domain.repository.SchoolRepository
+import com.example.timetable.domain.repository.CalendarRepository
 import com.example.timetable.domain.repository.ReminderRepository
 import com.example.timetable.domain.repository.SettingsRepository
 import com.example.timetable.domain.repository.TimetableRepository
@@ -320,5 +325,72 @@ class FakeReminderRepository : ReminderRepository {
 
     override suspend fun deleteRule(ruleId: Long) {
         rules.value = rules.value.filterNot { it.id == ruleId }
+    }
+}
+
+/**
+ * 日历仓储替身。
+ *
+ * 局限（已登记进 docs/device-verification.md）：本类**不模拟 ContentResolver**，
+ * 不碰 CalendarContract，也不产生真实的日历事件；applyChanges 只记录被调用的计划。
+ * 系统日历的真实行为（建日历、插入、RRULE 展开、权限路径）只能靠真机覆盖。
+ */
+class FakeCalendarRepository(
+    private val permissionsGranted: Boolean = true,
+    private val calendarId: Long? = 1L,
+) : CalendarRepository {
+
+    val links = mutableListOf<CalendarEventLink>()
+
+    var appliedPlans = mutableListOf<CalendarSyncPlan>()
+
+    var pruneCallCount = 0
+        private set
+
+    var clearCallCount = 0
+        private set
+
+    val deletedCourseIds = mutableListOf<Long>()
+
+    override suspend fun hasCalendarPermissions(): Boolean = permissionsGranted
+
+    override suspend fun ensureCourseCalendar(): Long? =
+        if (permissionsGranted) calendarId else null
+
+    override suspend fun linksForCourses(courseIds: List<Long>): List<CalendarEventLink> =
+        links.filter { courseIds.contains(it.courseId) }
+
+    override suspend fun applyChanges(plan: CalendarSyncPlan): CalendarSyncResult {
+        if (!permissionsGranted) {
+            return CalendarSyncResult.Skipped(
+                com.example.timetable.domain.calendar.CalendarSkipReason.PERMISSION_DENIED,
+            )
+        }
+        appliedPlans += plan
+        return CalendarSyncResult.Synced(
+            CalendarSyncOutcome(
+                inserted = plan.inserts.size,
+                updated = plan.updates.size,
+                deleted = plan.deletes.size,
+                unchanged = plan.unchanged.size,
+                skippedCourses = plan.skippedCourses,
+            ),
+        )
+    }
+
+    override suspend fun deleteEventsForCourse(courseId: Long): CalendarSyncResult {
+        deletedCourseIds += courseId
+        return CalendarSyncResult.Synced(CalendarSyncOutcome())
+    }
+
+    override suspend fun pruneOrphanEvents(): Int {
+        pruneCallCount++
+        return 0
+    }
+
+    override suspend fun clearSyncedEvents(): CalendarSyncResult {
+        clearCallCount++
+        links.clear()
+        return CalendarSyncResult.Synced(CalendarSyncOutcome())
     }
 }

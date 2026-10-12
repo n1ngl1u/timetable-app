@@ -7,5 +7,5 @@ import androidx.room.migration.Migration
  */
 object Migrations {
 
-    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2)
+    val ALL: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3)
 }

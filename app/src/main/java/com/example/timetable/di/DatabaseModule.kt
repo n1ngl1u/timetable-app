@@ -1,5 +1,6 @@
 package com.example.timetable.di
 
+import com.example.timetable.data.local.dao.CalendarEventLinkDao
 import com.example.timetable.data.local.dao.CourseDao
 import com.example.timetable.data.local.dao.GradeDao
 import com.example.timetable.data.local.dao.ReminderDao
@@ -32,6 +33,10 @@ object DatabaseModule {
 
     @Provides
     fun provideReminderDao(database: AppDatabase): ReminderDao = database.reminderDao()
+
+    @Provides
+    fun provideCalendarEventLinkDao(database: AppDatabase): CalendarEventLinkDao =
+        database.calendarEventLinkDao()
 
     @Provides
     fun provideGradeDao(database: AppDatabase): GradeDao = database.gradeDao()

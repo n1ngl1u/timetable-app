@@ -1,184 +1,231 @@
 package com.example.timetable.data.repository
 
-import android.content.ContentResolver
-import android.content.ContentUris
-import android.content.ContentValues
-import android.content.Context
-import android.net.Uri
-import android.provider.CalendarContract
+import android.util.Log
+import androidx.room.withTransaction
 import com.example.timetable.core.common.DispatcherProvider
-import com.example.timetable.domain.model.Course
-import com.example.timetable.domain.model.TimeSlot
-import com.example.timetable.domain.model.Timetable
+import com.example.timetable.core.time.TimeProvider
+import com.example.timetable.data.calendar.CalendarContractClient
+import com.example.timetable.data.calendar.CalendarPermissionChecker
+import com.example.timetable.data.local.dao.CalendarEventLinkDao
+import com.example.timetable.data.local.db.AppDatabase
+import com.example.timetable.data.local.entity.CalendarEventLinkEntity
+import com.example.timetable.domain.calendar.CalendarEventLink
+import com.example.timetable.domain.calendar.CalendarEventSpec
+import com.example.timetable.domain.calendar.CalendarSkipReason
+import com.example.timetable.domain.calendar.CalendarSyncOutcome
+import com.example.timetable.domain.calendar.CalendarSyncPlan
+import com.example.timetable.domain.calendar.CalendarSyncResult
 import com.example.timetable.domain.repository.CalendarRepository
-import com.example.timetable.domain.repository.TimetableRepository
-import dagger.hilt.android.qualifiers.ApplicationContext
-import java.time.LocalDateTime
-import java.time.LocalTime
-import java.time.ZoneId
-import java.time.format.DateTimeParseException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.withContext
 
-/**
- * 单向同步（A7）：App -> 系统日历，写入设备默认账号下的「课程表」专用日历，不询问账号。
- */
 @Singleton
 class CalendarRepositoryImpl @Inject constructor(
-    @ApplicationContext private val context: Context,
-    private val timetableRepository: TimetableRepository,
+    private val database: AppDatabase,
+    private val linkDao: CalendarEventLinkDao,
+    private val client: CalendarContractClient,
+    private val permissionChecker: CalendarPermissionChecker,
+    private val timeProvider: TimeProvider,
     private val dispatchers: DispatcherProvider,
 ) : CalendarRepository {
 
-    private val resolver: ContentResolver get() = context.contentResolver
+    override suspend fun hasCalendarPermissions(): Boolean =
+        withContext(dispatchers.io) { permissionChecker.hasAllPermissions() }
 
-    private val zoneId: ZoneId get() = ZoneId.systemDefault()
+    override suspend fun ensureCourseCalendar(): Long? =
+        withContext(dispatchers.io) { client.ensureCourseCalendar() }
 
-    override suspend fun syncTimetable(timetableId: Long): Int = withContext(dispatchers.io) {
-        val timetable = timetableRepository.timetable(timetableId) ?: return@withContext 0
-        val calendarId = ensureCourseCalendar() ?: return@withContext 0
-        clearSyncedEvents()
-        var inserted = 0
-        for (course in timetable.courses) {
-            val startTime = startTimeOf(timetable, course) ?: continue
-            val endTime = endTimeOf(timetable, course) ?: continue
-            for (week in course.weeks) {
-                val date = timetable.startDate
-                    .plusWeeks((week - 1).toLong())
-                    .plusDays((course.weekday - 1).toLong())
-                val startMillis = LocalDateTime.of(date, startTime)
-                    .atZone(zoneId)
-                    .toInstant()
-                    .toEpochMilli()
-                val endMillis = LocalDateTime.of(date, endTime)
-                    .atZone(zoneId)
-                    .toInstant()
-                    .toEpochMilli()
-                if (insertEvent(calendarId, course, startMillis, endMillis) != null) {
-                    inserted++
-                }
+    override suspend fun linksForCourses(courseIds: List<Long>): List<CalendarEventLink> =
+        withContext(dispatchers.io) {
+            if (courseIds.isEmpty()) {
+                emptyList()
+            } else {
+                linkDao.findByCourseIds(courseIds).map { it.toDomain() }
             }
         }
-        inserted
+
+    override suspend fun applyChanges(plan: CalendarSyncPlan): CalendarSyncResult =
+        withContext(dispatchers.io) {
+            if (!permissionChecker.hasAllPermissions()) {
+                return@withContext CalendarSyncResult.Skipped(
+                    CalendarSkipReason.PERMISSION_DENIED,
+                    "未授予读取/写入日历权限",
+                )
+            }
+            val calendarId = client.ensureCourseCalendar()
+                ?: return@withContext CalendarSyncResult.Skipped(
+                    CalendarSkipReason.NO_WRITABLE_CALENDAR,
+                    "无法创建或找到可写的「课程表」日历",
+                )
+
+            val createdEventIds = mutableListOf<Long>()
+            val staleEventIds = mutableListOf<Long>()
+            val newLinks = mutableListOf<CalendarEventLinkEntity>()
+            val now = timeProvider.epochMillis()
+
+            try {
+                for (insert in plan.inserts) {
+                    val eventId = client.insertEvent(calendarId, insert.spec)
+                        ?: throw IllegalStateException(
+                            "插入日历事件失败 courseId=" + insert.courseId,
+                        )
+                    createdEventIds += eventId
+                    newLinks += insert.spec.toEntity(insert.courseId, eventId, now)
+                }
+                for (update in plan.updates) {
+                    client.updateEvent(update.calendarEventId, update.spec)
+                    staleEventIds += update.calendarEventId
+                    newLinks += update.spec.toEntity(update.courseId, update.calendarEventId, now)
+                }
+                for (delete in plan.deletes) {
+                    client.deleteEvent(delete.calendarEventId)
+                    staleEventIds += delete.calendarEventId
+                }
+            } catch (error: Exception) {
+                // CalendarProvider 没有跨条事务：只能补偿删除本次新建的事件。
+                // 单条补偿失败不中断其余补偿，失败的 event id 打进日志供人工清理。
+                val failedCompensations = mutableListOf<Long>()
+                for (eventId in createdEventIds) {
+                    runCatching { client.deleteEvent(eventId) }
+                        .onFailure { failedCompensations += eventId }
+                }
+                if (failedCompensations.isNotEmpty()) {
+                    Log.e(
+                        TAG,
+                        "补偿回滚失败，残留孤儿事件 eventIds=" + failedCompensations +
+                            "（可在系统日历「课程表」中手动删除，或调 clearSyncedEvents 全量重建）",
+                    )
+                }
+                return@withContext CalendarSyncResult.Failed(
+                    error.message ?: "写入系统日历失败，已回滚本次新建事件",
+                )
+            }
+
+            database.withTransaction {
+                if (staleEventIds.isNotEmpty()) linkDao.deleteByEventIds(staleEventIds)
+                if (newLinks.isNotEmpty()) linkDao.insertAll(newLinks)
+            }
+
+            CalendarSyncResult.Synced(
+                CalendarSyncOutcome(
+                    inserted = plan.inserts.size,
+                    updated = plan.updates.size,
+                    deleted = plan.deletes.size,
+                    unchanged = plan.unchanged.size,
+                    failed = 0,
+                    skippedCourses = plan.skippedCourses,
+                ),
+            )
+        }
+
+    override suspend fun deleteEventsForCourse(courseId: Long): CalendarSyncResult =
+        withContext(dispatchers.io) {
+            if (!permissionChecker.hasAllPermissions()) {
+                return@withContext CalendarSyncResult.Skipped(
+                    CalendarSkipReason.PERMISSION_DENIED,
+                    "未授予读取/写入日历权限",
+                )
+            }
+            val links = linkDao.findByCourseIds(listOf(courseId))
+            if (links.isEmpty()) {
+                return@withContext CalendarSyncResult.Synced(CalendarSyncOutcome())
+            }
+            val removed = mutableListOf<Long>()
+            val failed = mutableListOf<Long>()
+            for (link in links) {
+                runCatching { client.deleteEvent(link.calendarEventId) }
+                    .onSuccess { removed += link.calendarEventId }
+                    .onFailure {
+                        failed += link.calendarEventId
+                        Log.w(TAG, "删除日历事件失败 eventId=" + link.calendarEventId)
+                    }
+            }
+            // 只清掉确认删除成功的 link，失败的保留以便下次重试
+            if (removed.isNotEmpty()) linkDao.deleteByEventIds(removed)
+            CalendarSyncResult.Synced(
+                CalendarSyncOutcome(deleted = removed.size, failed = failed.size),
+            )
+        }
+
+    override suspend fun pruneOrphanEvents(): Int = withContext(dispatchers.io) {
+        if (!permissionChecker.hasAllPermissions()) return@withContext 0
+        val calendarId = client.ensureCourseCalendar() ?: return@withContext 0
+        val inCalendar = client.eventIdsInCalendar(calendarId)
+        val linked = linkDao.findAll().map { it.calendarEventId }.toSet()
+
+        // 指向已消失事件的 link：用户可能手工删过事件，留着只会让 diff 误判为「已存在」
+        val danglingLinks = linked - inCalendar
+        if (danglingLinks.isNotEmpty()) linkDao.deleteByEventIds(danglingLinks.toList())
+
+        val orphans = inCalendar - linked
+        if (orphans.isEmpty()) return@withContext 0
+        var pruned = 0
+        for (eventId in orphans) {
+            runCatching { client.deleteEvent(eventId) }
+                .onSuccess { pruned++ }
+                .onFailure { Log.w(TAG, "孤儿事件清理失败 eventId=" + eventId) }
+        }
+        pruned
     }
 
-    override suspend fun clearSyncedEvents(): Int = withContext(dispatchers.io) {
-        val calendarId = findCourseCalendar() ?: return@withContext 0
-        resolver.delete(
-            CalendarContract.Events.CONTENT_URI,
-            CalendarContract.Events.CALENDAR_ID + " = ?",
-            arrayOf(calendarId.toString()),
+    override suspend fun clearSyncedEvents(): CalendarSyncResult = withContext(dispatchers.io) {
+        if (!permissionChecker.hasAllPermissions()) {
+            return@withContext CalendarSyncResult.Skipped(
+                CalendarSkipReason.PERMISSION_DENIED,
+                "未授予读取/写入日历权限",
+            )
+        }
+        val calendarId = client.ensureCourseCalendar()
+            ?: return@withContext CalendarSyncResult.Skipped(
+                CalendarSkipReason.NO_WRITABLE_CALENDAR,
+                "无法创建或找到可写的「课程表」日历",
+            )
+        val eventIds = client.eventIdsInCalendar(calendarId)
+        var deleted = 0
+        val failed = mutableListOf<Long>()
+        for (eventId in eventIds) {
+            runCatching { client.deleteEvent(eventId) }
+                .onSuccess { deleted++ }
+                .onFailure {
+                    failed += eventId
+                    Log.w(TAG, "清空日历事件失败 eventId=" + eventId)
+                }
+        }
+        if (failed.isEmpty()) {
+            linkDao.deleteAll()
+        } else {
+            Log.e(TAG, "清空未完成，保留 link 记录以便重试 failed=" + failed)
+        }
+        CalendarSyncResult.Synced(
+            CalendarSyncOutcome(deleted = deleted, failed = failed.size),
         )
     }
 
-    private fun insertEvent(
-        calendarId: Long,
-        course: Course,
-        startMillis: Long,
-        endMillis: Long,
-    ): Uri? {
-        val values = ContentValues().apply {
-            put(CalendarContract.Events.CALENDAR_ID, calendarId)
-            put(CalendarContract.Events.TITLE, course.name)
-            put(CalendarContract.Events.EVENT_LOCATION, course.location)
-            put(CalendarContract.Events.DESCRIPTION, descriptionOf(course))
-            put(CalendarContract.Events.DTSTART, startMillis)
-            put(CalendarContract.Events.DTEND, endMillis)
-            put(CalendarContract.Events.EVENT_TIMEZONE, zoneId.id)
-        }
-        return resolver.insert(CalendarContract.Events.CONTENT_URI, values)
-    }
-
-    private fun descriptionOf(course: Course): String =
-        if (course.teacher.isBlank()) course.location else course.teacher + " / " + course.location
-
-    private fun startTimeOf(timetable: Timetable, course: Course): LocalTime? =
-        timeOf(timetable, course.startSection) { slot -> slot.startTime }
-
-    private fun endTimeOf(timetable: Timetable, course: Course): LocalTime? =
-        timeOf(timetable, course.endSection) { slot -> slot.endTime }
-
-    private fun timeOf(
-        timetable: Timetable,
-        section: Int,
-        selector: (TimeSlot) -> String,
-    ): LocalTime? {
-        val slot = timetable.timeSlots.firstOrNull { it.number == section } ?: return null
-        return try {
-            LocalTime.parse(selector(slot))
-        } catch (error: DateTimeParseException) {
-            null
-        }
-    }
-
-    private fun ensureCourseCalendar(): Long? {
-        findCourseCalendar()?.let { return it }
-        val account = findDefaultAccount() ?: LOCAL_ACCOUNT
-        val values = ContentValues().apply {
-            put(CalendarContract.Calendars.ACCOUNT_NAME, account.first)
-            put(CalendarContract.Calendars.ACCOUNT_TYPE, account.second)
-            put(CalendarContract.Calendars.NAME, CALENDAR_DISPLAY_NAME)
-            put(CalendarContract.Calendars.CALENDAR_DISPLAY_NAME, CALENDAR_DISPLAY_NAME)
-            put(CalendarContract.Calendars.CALENDAR_COLOR, CALENDAR_COLOR)
-            put(
-                CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL,
-                CalendarContract.Calendars.CAL_ACCESS_OWNER,
-            )
-            put(CalendarContract.Calendars.OWNER_ACCOUNT, account.first)
-            put(CalendarContract.Calendars.SYNC_EVENTS, 1)
-            put(CalendarContract.Calendars.VISIBLE, 1)
-        }
-        val uri = CalendarContract.Calendars.CONTENT_URI.buildUpon()
-            .appendQueryParameter(CalendarContract.CALLER_IS_SYNCADAPTER, "true")
-            .appendQueryParameter(CalendarContract.Calendars.ACCOUNT_NAME, account.first)
-            .appendQueryParameter(CalendarContract.Calendars.ACCOUNT_TYPE, account.second)
-            .build()
-        val inserted = resolver.insert(uri, values) ?: return null
-        return ContentUris.parseId(inserted)
-    }
-
-    private fun findCourseCalendar(): Long? = queryCalendarId(
-        selection = CalendarContract.Calendars.CALENDAR_DISPLAY_NAME + " = ?",
-        selectionArgs = arrayOf(CALENDAR_DISPLAY_NAME),
+    private fun CalendarEventSpec.toEntity(
+        courseId: Long,
+        eventId: Long,
+        syncedAt: Long,
+    ): CalendarEventLinkEntity = CalendarEventLinkEntity(
+        courseId = courseId,
+        calendarEventId = eventId,
+        segmentStartWeek = segmentStartWeek,
+        segmentEndWeek = segmentEndWeek,
+        contentHash = contentHash,
+        syncedAt = syncedAt,
     )
 
-    private fun findDefaultAccount(): Pair<String, String>? {
-        val cursor = resolver.query(
-            CalendarContract.Calendars.CONTENT_URI,
-            arrayOf(
-                CalendarContract.Calendars.ACCOUNT_NAME,
-                CalendarContract.Calendars.ACCOUNT_TYPE,
-            ),
-            CalendarContract.Calendars.ACCOUNT_NAME + " IS NOT NULL",
-            null,
-            CalendarContract.Calendars._ID + " ASC",
-        ) ?: return null
-        cursor.use { activeCursor ->
-            if (!activeCursor.moveToFirst()) return null
-            val accountName = activeCursor.getString(0) ?: return null
-            val accountType = activeCursor.getString(1) ?: return null
-            return accountName to accountType
-        }
-    }
-
-    private fun queryCalendarId(selection: String, selectionArgs: Array<String>): Long? {
-        val cursor = resolver.query(
-            CalendarContract.Calendars.CONTENT_URI,
-            arrayOf(CalendarContract.Calendars._ID),
-            selection,
-            selectionArgs,
-            null,
-        ) ?: return null
-        cursor.use { activeCursor ->
-            if (!activeCursor.moveToFirst()) return null
-            return activeCursor.getLong(0)
-        }
-    }
+    private fun CalendarEventLinkEntity.toDomain(): CalendarEventLink = CalendarEventLink(
+        id = id,
+        courseId = courseId,
+        calendarEventId = calendarEventId,
+        segmentStartWeek = segmentStartWeek,
+        segmentEndWeek = segmentEndWeek,
+        contentHash = contentHash,
+        syncedAt = syncedAt,
+    )
 
     private companion object {
-        const val CALENDAR_DISPLAY_NAME = "课程表"
-        const val CALENDAR_COLOR = -0x1a237e
-        val LOCAL_ACCOUNT = "Timetable" to CalendarContract.ACCOUNT_TYPE_LOCAL
+        const val TAG = "TimetableCalendar"
     }
 }
