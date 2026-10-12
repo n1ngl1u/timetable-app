@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Macrobenchmark 要求被测应用对 shell 可 profile，且该构建类型不可 debuggable -->
+    <application>
+        <profileable android:shell="true" />
+    </application>
+
+</manifest>

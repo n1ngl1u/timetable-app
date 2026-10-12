@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">课程表</string>
+    <string name="root_loading">正在加载…</string>
+    <string name="root_empty">还没有课表</string>
+    <string name="root_error">加载失败</string>
+</resources>
