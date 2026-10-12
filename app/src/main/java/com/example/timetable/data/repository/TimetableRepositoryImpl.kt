@@ -43,6 +43,9 @@ class TimetableRepositoryImpl @Inject constructor(
             .map { entities -> entities.map { it.toDomain() } }
             .flowOn(dispatchers.io)
 
+    override fun observeTotalCourseCount(): Flow<Int> =
+        courseDao.observeTotalCount().flowOn(dispatchers.io)
+
     override suspend fun timetable(timetableId: Long): Timetable? = withContext(dispatchers.io) {
         timetableDao.findById(timetableId)?.let { loadFull(it) }
     }

@@ -11,6 +11,15 @@ object TraceTags {
     const val ACTIVITY_ON_CREATE = "activity_on_create"
 
     const val IMPORT_START = "import_start"
+
+    /** 解析阶段与落库阶段的子 span，把导入总耗时拆成可定位的两段。 */
+    const val IMPORT_PARSE = "import_parse"
+    const val IMPORT_PERSIST = "import_persist"
+
+    /**
+     * 导入耗时 T0 -> T1（A5）：
+     * T0 = UI 触发导入；T1 = 课表数据已落库并对 UI 层可观察（Compose 同一数据流即刻重组）。
+     */
     const val IMPORT_FIRST_FRAME = "import_first_frame"
 
     const val WIDGET_DATA_CHANGED = "widget_data_changed"

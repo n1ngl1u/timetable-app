@@ -18,7 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.timetable.R
 import com.example.timetable.core.ui.UiEvent
@@ -37,12 +37,6 @@ fun RootScreen(
     LaunchedEffect(autoImportPayload) {
         if (!autoImportPayload.isNullOrBlank()) {
             viewModel.importPayload(autoImportPayload)
-        }
-    }
-
-    LaunchedEffect(state) {
-        if (state is UiState.Success<*>) {
-            viewModel.onStateRendered()
         }
     }
 
@@ -74,10 +68,17 @@ fun RootScreen(
                     text = stringResource(id = R.string.root_error) + ": " + current.error.message,
                     color = MaterialTheme.colorScheme.error,
                 )
-                is UiState.Success<*> -> Text(
-                    text = current.data?.let { it.toString() } ?: stringResource(id = R.string.root_empty),
-                )
+                is UiState.Success<*> -> Text(text = summaryOf(current.data as? RootUiModel))
             }
         }
     }
 }
+
+/** 首页摘要严格一行文本，不引入卡片 / 列表 / 分组标题。 */
+@Composable
+private fun summaryOf(model: RootUiModel?): String =
+    if (model != null && model.courseCount > 0) {
+        stringResource(id = R.string.root_course_count, model.courseCount)
+    } else {
+        stringResource(id = R.string.root_empty)
+    }

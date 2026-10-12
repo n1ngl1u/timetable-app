@@ -98,6 +98,13 @@ android {
         abortOnError = false
         checkReleaseBuilds = false
     }
+
+    testOptions {
+        unitTests {
+            // 纯 JVM 单测里 PerfTracer 会调用 android.util.Log，未开启时抛 "not mocked"
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 kotlin {
@@ -122,6 +129,7 @@ dependencies {
 
     implementation(libs.hilt.android)
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
     ksp(libs.hilt.compiler)
 
     implementation(libs.androidx.room.runtime)

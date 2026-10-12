@@ -26,8 +26,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         perfTracer.mark(TraceTags.ACTIVITY_ON_CREATE)
         jankStatsTracker.start(this)
-        val autoImport = intent?.getBooleanExtra(EXTRA_AUTO_IMPORT, false) ?: false
-        val payload = if (autoImport) intent?.getStringExtra(EXTRA_TIMETABLE_JSON) else null
+        val payload = intent?.getStringExtra(EXTRA_TIMETABLE_JSON)?.takeIf { it.isNotBlank() }
         setContent {
             TimetableTheme {
                 AppNavHost(autoImportPayload = payload)
@@ -41,7 +40,7 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
-        /** Macrobenchmark 稳定触发导入的入口参数。 */
+        /** 与 [EXTRA_TIMETABLE_JSON] 同时使用；单独给 JSON 也会触发导入，此开关仅为基准测试语义显式化。 */
         const val EXTRA_AUTO_IMPORT = "auto_import"
 
         const val EXTRA_TIMETABLE_JSON = "timetable_json"

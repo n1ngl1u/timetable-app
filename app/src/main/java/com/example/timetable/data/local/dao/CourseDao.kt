@@ -25,6 +25,9 @@ interface CourseDao {
     @Query("SELECT * FROM courses WHERE id = :courseId")
     suspend fun findById(courseId: Long): CourseEntity?
 
+    @Query("SELECT COUNT(*) FROM courses")
+    fun observeTotalCount(): Flow<Int>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(entities: List<CourseEntity>): List<Long>
 
