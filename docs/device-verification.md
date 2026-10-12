@@ -41,6 +41,8 @@
 | 31 | 系统栏隐藏与恢复 + 冷启动闪烁观察 | `.../PureModeTest#systemBarsAreHiddenAndRestored`；另需手工观察：纯净模式开启状态下冷启动，状态栏是否有一帧可见的闪烁（开关存 DataStore，首帧必然按默认可见渲染；本批刻意不引入第二份真源来消除它） | 真机 | 未执行 |
 | 32 | 进程重建后纯净模式保持（含系统栏重新隐藏） | `.../PureModeTest#pureModeSurvivesActivityRecreation` | 真机/模拟器 | 未执行 |
 | 33 | 返回键与 ModalBottomSheet 的优先级 | `.../PureModeTest#calendarSheetBackDismissStillWorksWhenPureModeIsOff`；说明项：**「纯净模式开启 + 抽屉打开」在 UI 上不可达**——打开纯净模式会直达课表页并隐藏导航栏，用户没有入口回到日历页。已覆盖可达的另一半：纯净模式关闭时外壳不注册 BackHandler，抽屉返回关闭照旧 | 真机/模拟器 | 未执行 |
+| 34 | 真实 Keystore 上的 StrongBox 路径 | `app/src/androidTest/.../data/crypto/KeystoreFieldCipherTest#strongBoxPathIsUsedWhenSupported`（断言 `KeyInfo.securityLevel == SECURITY_LEVEL_STRONGBOX`）；**设备不支持 StrongBox 时 `Assume` 跳过，需在报告里记录该机是否支持** | 真机，且设备具备 StrongBox | 未执行 |
+| 35 | 主密钥持久化：换一个 KeyStore 实例仍能取到同一密钥并解密旧密文 | `app/src/androidTest/.../data/crypto/SecurePrefsPersistenceTest#credentialsWrittenByOneInstanceAreReadableByAnother`；**说明**：这是近似验证（证明密钥落在 Keystore 而非进程内存），真正的「杀进程重启后仍可解密」无法在 instrumented 测试里完成（force-stop 会带走 instrumentation），需手工：存凭据 → 上滑杀掉进程 → 重开应用 → 确认仍能读出 | 真机 | 未执行 |
 
 ## 孤儿事件清理指引
 

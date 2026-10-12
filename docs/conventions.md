@@ -61,3 +61,8 @@
 
 **背景原因**：`View.systemUiVisibility` 在 API 30+ 已废弃，与 edge-to-edge 并存时 `hide` 会静默失效，表现为「代码执行了但状态栏还在」，且不抛任何异常。
 **硬规则**：隐藏/恢复系统栏一律 `WindowCompat.getInsetsController(window, decorView)`，并显式设置 `BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`，让用户仍能划出系统栏。
+
+### 12. 敏感字段加密必须绑定 AAD 上下文
+
+**背景原因**：AES-GCM 的 tag 只保证「这段密文没被改过」，不保证「这段密文属于这个字段或这条记录」。同一把主密钥下，把 A 记录的密文整段搬到 B 记录字段，解密照样成功——AAD 为空时这条搬运攻击是通的。
+**硬规则**：所有 `FieldCipher.encrypt/decrypt` 必须传非空 `aadContext`，形如 `用途:记录标识`（例：`credentials:account-a`）。默认空串**只允许**用于读取 v1 之前的旧密文。

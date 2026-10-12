@@ -2,6 +2,7 @@ package com.example.timetable.data.repository
 
 import com.example.timetable.core.common.DispatcherProvider
 import com.example.timetable.data.crypto.SecurePrefsStore
+import com.example.timetable.data.crypto.valueOrNull
 import com.example.timetable.domain.importer.LoginState
 import com.example.timetable.domain.importer.SchoolAdapter
 import com.example.timetable.domain.importer.SchoolCredentials
@@ -34,7 +35,7 @@ class SchoolRepositoryImpl @Inject constructor(
     ): String = withContext(dispatchers.io) { adapter.fetchTimetable(session, request) }
 
     override fun readStoredCredentials(schoolId: String): SchoolCredentials? =
-        securePrefsStore.readCredentials(schoolId)
+        securePrefsStore.readCredentials(schoolId).valueOrNull()
 
     override fun storeCredentials(schoolId: String, credentials: SchoolCredentials) {
         securePrefsStore.putCredentials(schoolId, credentials)

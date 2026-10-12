@@ -1,48 +1,83 @@
 package com.example.timetable.data.crypto
 
-import android.util.Base64
 import java.security.GeneralSecurityException
-import javax.crypto.Cipher
-import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.AEADBadTagException
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** 解密结果。legacyPayload = true 表示这条密文是 v1 之前的格式，调用方应重新加密写回。 */
+sealed interface FieldDecryptionResult {
+
+    data class Success(val plainText: String, val legacyPayload: Boolean) : FieldDecryptionResult
+
+    data class Failure(val error: SecurePrefsError) : FieldDecryptionResult
+}
+
 /**
- * 字段级 AES-256-GCM 加解密，输出 "base64(iv):base64(cipher)"。
+ * 字段级 AES-256-GCM 加解密，输出带版本前缀的载荷：v1:base64(iv):base64(cipherText)。
+ *
+ * AAD 绑定：aadContext 作为 AES-GCM 的附加认证数据。tag 只保证密文没被改过，
+ * 不保证「这段密文属于这个字段/这条记录」；绑定后把别的记录密文搬过来会解密失败。
+ * 默认空串只服务于读取 v1 之前的旧密文。
  */
 @Singleton
 class FieldCipher @Inject constructor(
-    private val keyProvider: CryptoKeyProvider,
+    private val masterKeySource: MasterKeySource,
+    private val engine: CipherEngine,
 ) {
 
-    fun encrypt(plainText: String): String {
-        val cipher = Cipher.getInstance(TRANSFORMATION)
-        cipher.init(Cipher.ENCRYPT_MODE, keyProvider.secretKey())
-        val encrypted = cipher.doFinal(plainText.toByteArray(Charsets.UTF_8))
-        return Base64.encodeToString(cipher.iv, Base64.NO_WRAP) +
-            SEPARATOR +
-            Base64.encodeToString(encrypted, Base64.NO_WRAP)
+    /** @throws SecurePrefsError 主密钥不可用时抛出。写路径没有「降级读」的语义，因此直接抛。 */
+    fun encrypt(plainText: String, aadContext: String = ""): String {
+        val raw = engine.encrypt(
+            key = masterKeySource.secretKey(),
+            aadContext = aadContext,
+            plainText = plainText.toByteArray(Charsets.UTF_8),
+        )
+        return CipherEnvelope.encode(raw.iv, raw.cipherText)
     }
 
-    fun decrypt(payload: String): String? {
-        val parts = payload.split(SEPARATOR)
-        if (parts.size != 2) return null
+    fun decrypt(payload: String, aadContext: String = ""): FieldDecryptionResult {
+        val frame = when (val parsed = CipherEnvelope.parse(payload)) {
+            is CipherEnvelope.Parsed.Unsupported ->
+                return FieldDecryptionResult.Failure(SecurePrefsError.UnsupportedFormat(parsed.prefix))
+            is CipherEnvelope.Parsed.Invalid ->
+                return FieldDecryptionResult.Failure(
+                    SecurePrefsError.IntegrityViolation(parsed.reason),
+                )
+            is CipherEnvelope.Parsed.Legacy ->
+                Triple(parsed.iv, parsed.cipherText, true)
+            is CipherEnvelope.Parsed.V1 ->
+                Triple(parsed.iv, parsed.cipherText, false)
+        }
+        val (iv, cipherText, legacy) = frame
+        // 旧密文一律用空 AAD 解密：骨架期没有 AAD 概念
+        val effectiveAad = if (legacy) LEGACY_AAD_CONTEXT else aadContext
+
         return try {
-            val iv = Base64.decode(parts[0], Base64.NO_WRAP)
-            val encrypted = Base64.decode(parts[1], Base64.NO_WRAP)
-            val cipher = Cipher.getInstance(TRANSFORMATION)
-            cipher.init(Cipher.DECRYPT_MODE, keyProvider.secretKey(), GCMParameterSpec(TAG_BITS, iv))
-            String(cipher.doFinal(encrypted), Charsets.UTF_8)
+            val plain = engine.decrypt(
+                key = masterKeySource.secretKey(),
+                aadContext = effectiveAad,
+                iv = iv,
+                cipherText = cipherText,
+            )
+            FieldDecryptionResult.Success(String(plain, Charsets.UTF_8), legacyPayload = legacy)
+        } catch (error: SecurePrefsError) {
+            FieldDecryptionResult.Failure(error)
+        } catch (error: AEADBadTagException) {
+            FieldDecryptionResult.Failure(
+                SecurePrefsError.IntegrityViolation("GCM tag 校验失败或 AAD 不匹配", error),
+            )
         } catch (error: GeneralSecurityException) {
-            null
+            FieldDecryptionResult.Failure(SecurePrefsError.Unrecoverable(error))
         } catch (error: IllegalArgumentException) {
-            null
+            FieldDecryptionResult.Failure(
+                SecurePrefsError.IntegrityViolation("密文参数非法", error),
+            )
         }
     }
 
-    private companion object {
-        const val TRANSFORMATION = "AES/GCM/NoPadding"
-        const val TAG_BITS = 128
-        const val SEPARATOR = ":"
+    internal companion object {
+        /** 旧密文的 AAD：空串即「加密时未调用 updateAAD」。 */
+        const val LEGACY_AAD_CONTEXT = ""
     }
 }
