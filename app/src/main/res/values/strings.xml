@@ -59,6 +59,14 @@
     <string name="calendar_day_empty">今日无课</string>
 
     <string name="settings_title">设置</string>
+    <string name="settings_theme_section">主题</string>
+    <string name="settings_theme_default">默认</string>
+    <string name="settings_theme_time_of_day">时间动态</string>
+    <string name="settings_theme_liquid_glass">液态玻璃</string>
+    <string name="settings_dark_mode">深色模式</string>
+    <string name="settings_dark_mode_follow">跟随系统</string>
+    <string name="settings_dark_mode_light">浅色</string>
+    <string name="settings_dark_mode_dark">深色</string>
     <string name="settings_calendar_section">系统日历</string>
     <string name="settings_calendar_sync">同步到系统日历</string>
     <string name="settings_calendar_sync_desc">把当前课表的课程按周次写入系统日历的「课程表」日历</string>

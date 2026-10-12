@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.lifecycle.lifecycleScope
@@ -12,6 +13,8 @@ import com.example.timetable.core.perf.JankStatsTracker
 import com.example.timetable.core.perf.PerfTracer
 import com.example.timetable.core.perf.TraceTags
 import com.example.timetable.navigation.AppNavHost
+import com.example.timetable.ui.theme.ThemeViewModel
+import com.example.timetable.ui.theme.TimetableThemeHost
 import com.example.timetable.ui.theme.TimetableTheme
 import com.example.timetable.widget.WidgetDataObserver
 import com.example.timetable.data.reminder.ReminderScheduler
@@ -22,6 +25,9 @@ import javax.inject.Inject
 @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    private val themeViewModel: ThemeViewModel by viewModels()
+
 
     @Inject
     lateinit var perfTracer: PerfTracer
@@ -45,7 +51,8 @@ class MainActivity : ComponentActivity() {
         jankStatsTracker.start(this)
         val payload = intent?.getStringExtra(EXTRA_TIMETABLE_JSON)?.takeIf { it.isNotBlank() }
         setContent {
-            TimetableTheme {
+            // 主题偏好变化只重组，不重建 Activity
+            TimetableThemeHost(viewModel = themeViewModel) {
                 // 不声明 configChanges，旋转走默认重建，windowSizeClass 随之更新
                 AppNavHost(
                     windowSizeClass = calculateWindowSizeClass(this),

@@ -35,6 +35,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.timetable.R
 import com.example.timetable.core.ui.UiEvent
+import com.example.timetable.ui.theme.DarkModePreference
+import com.example.timetable.ui.theme.ThemeId
 import com.example.timetable.core.ui.UiState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -79,6 +81,13 @@ fun SettingsScreen(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            ThemeSection(
+                themeId = model?.themeId ?: ThemeId.FALLBACK,
+                darkModePreference = model?.darkModePreference ?: DarkModePreference.FALLBACK,
+                onThemeSelected = viewModel::onThemeSelected,
+                onDarkModePreferenceChange = viewModel::onDarkModePreferenceChange,
+            )
+            HorizontalDivider()
             Text(
                 text = stringResource(id = R.string.settings_calendar_section),
                 style = MaterialTheme.typography.titleSmall,

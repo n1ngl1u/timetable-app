@@ -9,6 +9,8 @@ import com.example.timetable.domain.calendar.CalendarSyncResult
 import com.example.timetable.domain.repository.CalendarRepository
 import com.example.timetable.domain.repository.SettingsRepository
 import com.example.timetable.domain.usecase.SyncToCalendarUseCase
+import com.example.timetable.ui.theme.DarkModePreference
+import com.example.timetable.ui.theme.ThemeId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.channels.BufferOverflow
@@ -22,6 +24,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 data class SettingsUiModel(
+    val themeId: ThemeId,
+    val darkModePreference: DarkModePreference,
     val calendarSyncEnabled: Boolean,
     val calendarPermissionGranted: Boolean,
     val lastSyncSummary: String?,
@@ -65,6 +69,8 @@ class SettingsViewModel @Inject constructor(
                 lastSyncSummary,
             ) { settings, permissionGranted, summary ->
                 SettingsUiModel(
+                    themeId = ThemeId.fromStorage(settings.themeId),
+                    darkModePreference = DarkModePreference.fromStorage(settings.darkModePreference),
                     calendarSyncEnabled = settings.calendarSyncEnabled,
                     calendarPermissionGranted = permissionGranted,
                     lastSyncSummary = summary,
@@ -72,6 +78,25 @@ class SettingsViewModel @Inject constructor(
             }.collect { model -> mutableState.value = UiState.Success(model) }
         }
         viewModelScope.launch { refreshPermissionState() }
+    }
+
+    /**
+     * 乐观更新：DataStore 的 edit 会先把新值推给 data flow、再落盘，
+     * 所以 UI 立刻切换，磁盘写入在后台进行；写失败静默吞掉，
+     * 表现是下次启动回到旧主题，而不是弹一个用户无法处理的错误。
+     */
+    fun onThemeSelected(themeId: ThemeId) {
+        viewModelScope.launch {
+            runCatching { settingsRepository.update { it.copy(themeId = themeId.storageKey) } }
+        }
+    }
+
+    fun onDarkModePreferenceChange(preference: DarkModePreference) {
+        viewModelScope.launch {
+            runCatching {
+                settingsRepository.update { it.copy(darkModePreference = preference.storageKey) }
+            }
+        }
     }
 
     /**

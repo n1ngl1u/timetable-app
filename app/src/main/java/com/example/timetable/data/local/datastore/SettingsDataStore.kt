@@ -49,6 +49,7 @@ class SettingsDataStore @Inject constructor(
         context.settingsDataStore.edit { preferences ->
             val updated = transform(preferences.toAppSettings())
             preferences[Keys.THEME_ID] = updated.themeId
+            preferences[Keys.DARK_MODE_PREFERENCE] = updated.darkModePreference
             preferences[Keys.PURE_MODE] = updated.pureModeEnabled
             preferences[Keys.REMINDERS_ENABLED] = updated.remindersEnabled
             preferences[Keys.CALENDAR_SYNC_ENABLED] = updated.calendarSyncEnabled
@@ -65,7 +66,9 @@ class SettingsDataStore @Inject constructor(
     }
 
     private fun Preferences.toAppSettings(): AppSettings = AppSettings(
-        themeId = this[Keys.THEME_ID] ?: AppSettings.THEME_SYSTEM,
+        themeId = this[Keys.THEME_ID] ?: AppSettings.DEFAULT_THEME_ID,
+        darkModePreference = this[Keys.DARK_MODE_PREFERENCE]
+            ?: AppSettings.DEFAULT_DARK_MODE_PREFERENCE,
         pureModeEnabled = this[Keys.PURE_MODE] ?: false,
         remindersEnabled = this[Keys.REMINDERS_ENABLED] ?: false,
         calendarSyncEnabled = this[Keys.CALENDAR_SYNC_ENABLED] ?: false,
@@ -79,6 +82,7 @@ class SettingsDataStore @Inject constructor(
 
     private object Keys {
         val THEME_ID = stringPreferencesKey("theme_id")
+        val DARK_MODE_PREFERENCE = stringPreferencesKey("dark_mode_preference")
         val PURE_MODE = booleanPreferencesKey("pure_mode")
         val REMINDERS_ENABLED = booleanPreferencesKey("reminders_enabled")
         val CALENDAR_SYNC_ENABLED = booleanPreferencesKey("calendar_sync_enabled")
