@@ -4,11 +4,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.lifecycle.lifecycleScope
 import com.example.timetable.core.perf.JankStatsTracker
 import com.example.timetable.core.perf.PerfTracer
 import com.example.timetable.core.perf.TraceTags
 import com.example.timetable.navigation.AppNavHost
 import com.example.timetable.ui.theme.TimetableTheme
+import com.example.timetable.widget.WidgetDataObserver
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -21,6 +23,9 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var jankStatsTracker: JankStatsTracker
 
+    @Inject
+    lateinit var widgetDataObserver: WidgetDataObserver
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -32,6 +37,17 @@ class MainActivity : ComponentActivity() {
                 AppNavHost(autoImportPayload = payload)
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // 观察窗口限定在前台：避免把一次 SQLCipher 开库塞进冷启动路径
+        widgetDataObserver.start(lifecycleScope)
+    }
+
+    override fun onStop() {
+        widgetDataObserver.stop()
+        super.onStop()
     }
 
     override fun onDestroy() {

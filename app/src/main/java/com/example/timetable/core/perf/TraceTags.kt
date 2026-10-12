@@ -22,8 +22,11 @@ object TraceTags {
      */
     const val IMPORT_FIRST_FRAME = "import_first_frame"
 
+    /** T0 标记：数据变更被观察到。 */
     const val WIDGET_DATA_CHANGED = "widget_data_changed"
-    const val WIDGET_UPDATE_RETURNED = "widget_update_returned"
+
+    /** T0 -> T1 的 span 名：数据变更到两个 widget 的 updateAll() 全部返回。 */
+    const val WIDGET_REFRESH = "widget_refresh"
 
     /** T0 -> T1 口径（A5）：数据变更到 GlanceAppWidget.update() 返回。 */
     const val WIDGET_REFRESH_BUDGET_MS = 500L

@@ -5,4 +5,25 @@
     <string name="root_empty">暂无数据</string>
     <string name="root_error">加载失败</string>
     <string name="root_course_count">已导入 %1$d 门课程</string>
+
+    <string name="widget_today_label">今日课程</string>
+    <string name="widget_today_title">今日课程</string>
+    <string name="widget_today_empty">今天没有课</string>
+    <string name="widget_today_description">显示今天的课程安排</string>
+
+    <string name="widget_week_label">一周概览</string>
+    <string name="widget_week_title">一周概览</string>
+    <string name="widget_week_empty">本周没有课</string>
+    <string name="widget_week_description">显示本周课程概览</string>
+
+    <string name="widget_no_timetable">尚未导入课表</string>
+    <string name="widget_week_format">第 %1$d 周</string>
+
+    <string name="widget_weekday_mon">周一</string>
+    <string name="widget_weekday_tue">周二</string>
+    <string name="widget_weekday_wed">周三</string>
+    <string name="widget_weekday_thu">周四</string>
+    <string name="widget_weekday_fri">周五</string>
+    <string name="widget_weekday_sat">周六</string>
+    <string name="widget_weekday_sun">周日</string>
 </resources>

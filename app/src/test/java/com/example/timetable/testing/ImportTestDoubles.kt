@@ -8,10 +8,12 @@ import com.example.timetable.domain.importer.SchoolCredentials
 import com.example.timetable.domain.importer.SchoolRegistry
 import com.example.timetable.domain.importer.SchoolSession
 import com.example.timetable.domain.importer.TimetableFetchRequest
+import com.example.timetable.domain.model.AppSettings
 import com.example.timetable.domain.model.Course
 import com.example.timetable.domain.model.TimeSlot
 import com.example.timetable.domain.model.Timetable
 import com.example.timetable.domain.repository.SchoolRepository
+import com.example.timetable.domain.repository.SettingsRepository
 import com.example.timetable.domain.repository.TimetableRepository
 import java.time.LocalDate
 import kotlinx.coroutines.CoroutineDispatcher
@@ -162,14 +164,15 @@ class FakeTimetableRepository(
 
     override suspend fun upsertTimetable(timetable: Timetable): Long {
         upsertError?.let { throw it }
-        val stored = timetable.copy(id = if (timetable.id == 0L) nextId else timetable.id)
+        val current = timetables.value
+        val stored = timetable.copy(id = if (timetable.id == 0L) nextId + current.size else timetable.id)
         upserted = stored
-        timetables.value = listOf(stored)
+        timetables.value = current.filterNot { it.id == stored.id } + stored
         return stored.id
     }
 
     override suspend fun deleteTimetable(timetableId: Long) {
-        timetables.value = emptyList()
+        timetables.value = timetables.value.filterNot { it.id == timetableId }
     }
 }
 
@@ -214,3 +217,26 @@ val SAMPLE_TIMETABLE: Timetable = Timetable(
         ),
     ),
 )
+
+class FakeSettingsRepository(
+    initial: AppSettings = AppSettings(),
+) : SettingsRepository {
+
+    private val state = MutableStateFlow(initial)
+
+    override val settings: Flow<AppSettings> = state.asStateFlow()
+
+    override suspend fun current(): AppSettings = state.value
+
+    override suspend fun update(transform: (AppSettings) -> AppSettings) {
+        state.value = transform(state.value)
+    }
+
+    override suspend fun setPureModeEnabled(enabled: Boolean) {
+        state.value = state.value.copy(pureModeEnabled = enabled)
+    }
+
+    override suspend fun setActiveTimetable(timetableId: Long) {
+        state.value = state.value.copy(activeTimetableId = timetableId)
+    }
+}
