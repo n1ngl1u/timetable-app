@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import com.example.timetable.core.perf.JankStatsTracker
@@ -17,6 +19,7 @@ import com.example.timetable.widget.WidgetRefresher
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
+@OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
@@ -43,7 +46,11 @@ class MainActivity : ComponentActivity() {
         val payload = intent?.getStringExtra(EXTRA_TIMETABLE_JSON)?.takeIf { it.isNotBlank() }
         setContent {
             TimetableTheme {
-                AppNavHost(autoImportPayload = payload)
+                // 不声明 configChanges，旋转走默认重建，windowSizeClass 随之更新
+                AppNavHost(
+                    windowSizeClass = calculateWindowSizeClass(this),
+                    autoImportPayload = payload,
+                )
             }
         }
     }

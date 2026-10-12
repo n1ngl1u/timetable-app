@@ -98,6 +98,12 @@ class TimetableRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun deleteCourse(courseId: Long) {
+        withContext(dispatchers.io) {
+            courseDao.deleteById(courseId)
+        }
+    }
+
     override suspend fun upsertSemester(semester: Semester): Long = withContext(dispatchers.io) {
         timetableDao.insertSemester(semester.toEntity())
     }

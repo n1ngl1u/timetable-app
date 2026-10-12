@@ -7,6 +7,7 @@ data class AppSettings(
     val themeId: String = THEME_SYSTEM,
     val pureModeEnabled: Boolean = false,
     val remindersEnabled: Boolean = false,
+    val calendarSyncEnabled: Boolean = false,
     val defaultReminderAdvanceMinutes: Int = ReminderRule.DEFAULT_ADVANCE_MINUTES,
     val activeSemesterId: Long = 0L,
     /**

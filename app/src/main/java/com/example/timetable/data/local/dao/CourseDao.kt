@@ -34,4 +34,7 @@ interface CourseDao {
 
     @Query("DELETE FROM courses WHERE timetable_id = :timetableId")
     suspend fun deleteByTimetable(timetableId: Long)
+
+    @Query("DELETE FROM courses WHERE id = :courseId")
+    suspend fun deleteById(courseId: Long)
 }

@@ -35,4 +35,38 @@
     <string name="reminder_advance_format">提前 %1$d 分钟</string>
     <string name="reminder_notifications_disabled">通知被禁用，提醒只会记录不会弹出</string>
     <string name="reminder_exact_alarm_disabled">未授予精确闹钟，已降级为不精确调度</string>
+
+    <string name="tab_timetable">课表</string>
+    <string name="tab_calendar">日历</string>
+    <string name="tab_settings">设置</string>
+
+    <string name="timetable_courses_empty">还没有课程，先导入一份课表</string>
+    <string name="timetable_course_delete">删除</string>
+    <string name="timetable_delete_title">删除这门课？</string>
+    <string name="timetable_delete_message">将同时删除系统日历中对应的课程事件。此操作不可撤销。</string>
+    <string name="timetable_delete_confirm">删除</string>
+    <string name="timetable_delete_cancel">取消</string>
+    <string name="timetable_deleted">已删除：%1$s</string>
+    <string name="timetable_delete_aborted">系统日历事件删除失败，已取消删除：%1$s</string>
+    <string name="timetable_delete_residual">日历权限已撤销，系统日历中可能残留旧事件，恢复权限后同步会自动清理</string>
+    <string name="timetable_section_format">第 %1$s 节</string>
+
+    <string name="calendar_title">日历</string>
+    <string name="calendar_month_format">%1$d 年 %2$d 月</string>
+    <string name="calendar_previous_month">上一月</string>
+    <string name="calendar_next_month">下一月</string>
+    <string name="calendar_day_courses">当天课程</string>
+    <string name="calendar_day_empty">今日无课</string>
+
+    <string name="settings_title">设置</string>
+    <string name="settings_calendar_section">系统日历</string>
+    <string name="settings_calendar_sync">同步到系统日历</string>
+    <string name="settings_calendar_sync_desc">把当前课表的课程按周次写入系统日历的「课程表」日历</string>
+    <string name="settings_calendar_permission_required">需要日历权限</string>
+    <string name="settings_calendar_open_settings">打开系统设置授权</string>
+    <string name="settings_calendar_synced">已同步：新增 %1$d，更新 %2$d，删除 %3$d</string>
+    <string name="settings_calendar_nothing_to_sync">没有可同步的课程</string>
+    <string name="settings_calendar_cleared">已移除系统日历中的课程事件</string>
+    <string name="settings_other_section">其他</string>
+    <string name="settings_other_placeholder">主题、纯净模式与加密设置将在后续模块提供</string>
 </resources>

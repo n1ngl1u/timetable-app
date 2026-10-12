@@ -1,4 +1,4 @@
-package com.example.timetable.ui.root
+package com.example.timetable.ui.timetable
 
 import android.content.Intent
 import android.net.Uri
@@ -45,15 +45,15 @@ import com.example.timetable.core.ui.UiState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun RootScreen(
+fun TimetableScreen(
     autoImportPayload: String?,
     modifier: Modifier = Modifier,
-    viewModel: RootViewModel = hiltViewModel(),
+    viewModel: TimetableViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    val model = (state as? UiState.Success<*>)?.data as? RootUiModel
+    val model = (state as? UiState.Success<*>)?.data as? TimetableUiModel
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { viewModel.onPermissionStateMaybeChanged() }
@@ -69,6 +69,7 @@ fun RootScreen(
             when (event) {
                 is UiEvent.ShowMessage -> snackbarHostState.showSnackbar(event.text)
                 is UiEvent.Navigate -> Unit
+                is UiEvent.RequestCalendarPermission -> Unit
                 is UiEvent.OpenSystemSettings -> {
                     val intent = Intent(event.action).apply {
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -107,21 +108,21 @@ fun RootScreen(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center,
-            ) {
-                when (val current = state) {
-                    UiState.Idle, UiState.Loading -> CircularProgressIndicator()
-                    UiState.Empty -> Text(text = stringResource(id = R.string.root_empty))
-                    is UiState.Error -> Text(
-                        text = stringResource(id = R.string.root_error) + ": " + current.error.message,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    is UiState.Success<*> -> Text(text = summaryOf(current.data as? RootUiModel))
+            Text(
+                text = summaryOf(model),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            if (state is UiState.Loading || state is UiState.Idle) {
+                Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
                 }
+            } else {
+                TimetableCourseList(
+                    courses = model?.courses.orEmpty(),
+                    onCourseLongPressed = viewModel::onCourseLongPressed,
+                    modifier = Modifier.weight(1f),
+                )
             }
             ReminderRow(
                 model = model,
@@ -130,11 +131,20 @@ fun RootScreen(
             )
         }
     }
+
+    val pendingDelete = model?.pendingDelete
+    if (pendingDelete != null) {
+        CourseDeleteDialog(
+            course = pendingDelete,
+            onConfirm = viewModel::onDeleteConfirmed,
+            onDismiss = viewModel::onDeleteDismissed,
+        )
+    }
 }
 
 /** 摘要严格一行文本，不引入卡片 / 列表 / 分组标题。 */
 @Composable
-private fun summaryOf(model: RootUiModel?): String =
+private fun summaryOf(model: TimetableUiModel?): String =
     if (model != null && model.courseCount > 0) {
         stringResource(id = R.string.root_course_count, model.courseCount)
     } else {
@@ -144,7 +154,7 @@ private fun summaryOf(model: RootUiModel?): String =
 /** 提醒开关 + 提前量三档，单行控件；权限异常时只在必要时补一行提示。 */
 @Composable
 private fun ReminderRow(
-    model: RootUiModel?,
+    model: TimetableUiModel?,
     onEnabledChange: (Boolean) -> Unit,
     onAdvanceChange: (Int) -> Unit,
 ) {
@@ -194,7 +204,6 @@ private fun ReminderRow(
     }
 }
 
-/** 课表切换入口：下拉列表，不做完整管理页，也不含删除。 */
 @Composable
 private fun TimetableSwitcher(
     options: List<TimetableOption>,

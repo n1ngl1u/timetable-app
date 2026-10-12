@@ -27,6 +27,10 @@
 | 17 | 日历权限**拒绝**路径的真实行为 | 手工：系统设置撤销日历权限 → 触发同步 → 确认返回 `Skipped(PERMISSION_DENIED)` 且不崩溃、不抛 SecurityException | 撤销授权；**无法自动化**（`pm revoke` 会杀掉被测进程） | 未执行 |
 | 18 | Room MIGRATION_2_3（v2→v3，新建 calendar_event_links + 两个索引） | `app/src/androidTest/.../data/local/db/Migration2To3Test` | 无 | 未执行 |
 | 19 | 增量同步真机表现：改时间/地点/周次后事件随之更新而非重建；重导入整表后孤儿事件被 `pruneOrphanEvents` 清掉 | 手工：改课程 → 看系统日历；重新导入 → 看事件数不翻倍 | 授予日历权限；**RRULE 在系统日历 App 里的展开效果需肉眼确认** | 未执行 |
+| 21 | 导航切换：三个 tab 互跳 | `app/src/androidTest/.../navigation/AppNavigationTest` | 真机/模拟器 | 未执行 |
+| 22 | 月视图点击某天弹出单日详情 Sheet | `app/src/androidTest/.../ui/calendar/CalendarScreenTest#clickingDayOpensSheetWithDateTitle` | 真机/模拟器 | 未执行 |
+| 23 | 单日详情 Sheet 内容正确（有课/空态）与左滑切月 | `.../CalendarScreenTest` | 真机/模拟器 | 未执行 |
+| 24 | 删除课程后系统日历事件与 link 记录都消失 | `app/src/androidTest/.../calendar/CalendarRepositoryDeleteEventsTest` | 授予 READ/WRITE_CALENDAR | 未执行 |
 | 20 | `FakeCalendarRepository` 的局限 | 说明项：该替身**不模拟 ContentResolver**，不产生真实日历事件，`applyChanges` 只记录计划；系统日历真实行为全部依赖第 15–19 项 | 无 | 已知边界 |
 
 ## 孤儿事件清理指引

@@ -196,6 +196,15 @@ class FakeTimetableRepository(
         timetables.value = timetables.value.filterNot { it.id == timetableId }
     }
 
+    val deletedCourseIds = mutableListOf<Long>()
+
+    override suspend fun deleteCourse(courseId: Long) {
+        deletedCourseIds += courseId
+        timetables.value = timetables.value.map { timetable ->
+            timetable.copy(courses = timetable.courses.filterNot { it.id == courseId })
+        }
+    }
+
     // 学期方法完整实现（非 UnsupportedOperationException）；本批无单测覆盖，学期模块接入后补。
     override suspend fun upsertSemester(semester: Semester): Long {
         val current = semesters.value
@@ -338,6 +347,7 @@ class FakeReminderRepository : ReminderRepository {
 class FakeCalendarRepository(
     private val permissionsGranted: Boolean = true,
     private val calendarId: Long? = 1L,
+    private val deleteResult: CalendarSyncResult? = null,
 ) : CalendarRepository {
 
     val links = mutableListOf<CalendarEventLink>()
@@ -380,7 +390,7 @@ class FakeCalendarRepository(
 
     override suspend fun deleteEventsForCourse(courseId: Long): CalendarSyncResult {
         deletedCourseIds += courseId
-        return CalendarSyncResult.Synced(CalendarSyncOutcome())
+        return deleteResult ?: CalendarSyncResult.Synced(CalendarSyncOutcome())
     }
 
     override suspend fun pruneOrphanEvents(): Int {

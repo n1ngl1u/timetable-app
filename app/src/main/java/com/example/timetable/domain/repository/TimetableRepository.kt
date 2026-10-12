@@ -27,6 +27,9 @@ interface TimetableRepository {
 
     suspend fun deleteTimetable(timetableId: Long)
 
+    /** 删除单门课。调用方必须先经 DeleteCourseUseCase 清掉系统日历事件。 */
+    suspend fun deleteCourse(courseId: Long)
+
     suspend fun upsertSemester(semester: Semester): Long
 
     suspend fun setActiveSemester(semesterId: Long)

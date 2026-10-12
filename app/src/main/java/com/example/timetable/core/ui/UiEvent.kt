@@ -13,4 +13,7 @@ sealed interface UiEvent {
 
     /** 仅在用户主动开启提醒时请求通知权限，冷启动不弹。 */
     data object RequestNotificationPermission : UiEvent
+
+    /** 仅在设置页打开「日历同步」时请求 READ/WRITE_CALENDAR。 */
+    data object RequestCalendarPermission : UiEvent
 }
