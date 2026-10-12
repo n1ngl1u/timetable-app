@@ -25,8 +25,9 @@ interface CourseDao {
     @Query("SELECT * FROM courses WHERE id = :courseId")
     suspend fun findById(courseId: Long): CourseEntity?
 
-    @Query("SELECT COUNT(*) FROM courses")
-    fun observeTotalCount(): Flow<Int>
+    /** 多课表下计数必须按课表过滤，全表计数会把其他课表的课程算进当前课表。 */
+    @Query("SELECT COUNT(*) FROM courses WHERE timetable_id = :timetableId")
+    fun observeCountByTimetable(timetableId: Long): Flow<Int>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(entities: List<CourseEntity>): List<Long>

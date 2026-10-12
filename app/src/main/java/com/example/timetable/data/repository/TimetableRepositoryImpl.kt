@@ -10,11 +10,13 @@ import com.example.timetable.data.local.entity.TimetableEntity
 import com.example.timetable.data.mapper.toDomain
 import com.example.timetable.data.mapper.toEntity
 import com.example.timetable.domain.model.Course
+import com.example.timetable.domain.model.Semester
 import com.example.timetable.domain.model.Timetable
 import com.example.timetable.domain.repository.TimetableRepository
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -43,8 +45,17 @@ class TimetableRepositoryImpl @Inject constructor(
             .map { entities -> entities.map { it.toDomain() } }
             .flowOn(dispatchers.io)
 
-    override fun observeTotalCourseCount(): Flow<Int> =
-        courseDao.observeTotalCount().flowOn(dispatchers.io)
+    override fun observeCourseCount(timetableId: Long?): Flow<Int> =
+        if (timetableId == null) {
+            flowOf(0)
+        } else {
+            courseDao.observeCountByTimetable(timetableId).flowOn(dispatchers.io)
+        }
+
+    override fun observeSemesters(): Flow<List<Semester>> =
+        timetableDao.observeSemesters()
+            .map { entities -> entities.map { it.toDomain() } }
+            .flowOn(dispatchers.io)
 
     override suspend fun timetable(timetableId: Long): Timetable? = withContext(dispatchers.io) {
         timetableDao.findById(timetableId)?.let { loadFull(it) }
@@ -68,6 +79,7 @@ class TimetableRepositoryImpl @Inject constructor(
                     timetableDao.update(entity)
                     entity.id
                 }
+                // 整表替换：同一事务内先清空旧数据，导入到已有课表时不保留旧课程
                 timeSlotDao.deleteByTimetable(timetableId)
                 if (timetable.timeSlots.isNotEmpty()) {
                     timeSlotDao.insertAll(timetable.timeSlots.map { it.toEntity(timetableId) })
@@ -83,6 +95,16 @@ class TimetableRepositoryImpl @Inject constructor(
     override suspend fun deleteTimetable(timetableId: Long) {
         withContext(dispatchers.io) {
             timetableDao.deleteById(timetableId)
+        }
+    }
+
+    override suspend fun upsertSemester(semester: Semester): Long = withContext(dispatchers.io) {
+        timetableDao.insertSemester(semester.toEntity())
+    }
+
+    override suspend fun setActiveSemester(semesterId: Long) {
+        withContext(dispatchers.io) {
+            timetableDao.setActiveSemester(semesterId)
         }
     }
 

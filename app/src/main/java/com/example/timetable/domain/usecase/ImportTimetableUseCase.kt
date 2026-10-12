@@ -13,6 +13,7 @@ import com.example.timetable.domain.importer.SchoolRegistry
 import com.example.timetable.domain.importer.SchoolSession
 import com.example.timetable.domain.model.Timetable
 import com.example.timetable.domain.repository.SchoolRepository
+import com.example.timetable.domain.repository.SettingsRepository
 import com.example.timetable.domain.repository.TimetableRepository
 import java.io.IOException
 import javax.inject.Inject
@@ -21,14 +22,15 @@ import kotlinx.coroutines.withContext
 /**
  * 导入编排：registry 取适配器 -> 可选登录 -> 取载荷 -> parse -> 落库，
  * 全程在 IO 线程，并把解析与落库拆成独立 span 供 ≤2s 指标定位。
- * 四类异常分别映射：IOException -> NetworkFailure，登录失败 -> SessionExpired，
- * CourseParseException(field 非空) -> MissingField，CourseParseException(field 为空) -> SchemaChanged；
- * 本地读取失败与其余兜底走 InvalidInput。
+ *
+ * 落库目标：request.timetableId -> 否则当前活跃课表 -> 否则新建；新建成功后置为活跃，
+ * 否则 UI 与小组件查不到任何东西。解析逻辑与错误映射不因多课表而改变。
  */
 class ImportTimetableUseCase @Inject constructor(
     private val schoolRegistry: SchoolRegistry,
     private val schoolRepository: SchoolRepository,
     private val timetableRepository: TimetableRepository,
+    private val settingsRepository: SettingsRepository,
     private val perfTracer: PerfTracer,
     private val dispatchers: DispatcherProvider,
 ) {
@@ -45,11 +47,17 @@ class ImportTimetableUseCase @Inject constructor(
             val payload = request.payload?.takeIf { it.isNotBlank() }
                 ?: schoolRepository.fetchPayload(adapter, session, request.fetchRequest)
             val parsed = parse(adapter, payload)
+            val requestedId = request.timetableId
+            val targetId = requestedId ?: settingsRepository.current().activeTimetableId
             val timetable = parsed.copy(
+                id = targetId ?: 0L,
                 tableName = request.tableName ?: parsed.tableName,
                 startDate = request.startDate ?: parsed.startDate,
             )
             val timetableId = persist(timetable)
+            if (targetId == null) {
+                settingsRepository.setActiveTimetable(timetableId)
+            }
             ImportResult.Success(
                 timetableId = timetableId,
                 courseCount = timetable.courses.size,

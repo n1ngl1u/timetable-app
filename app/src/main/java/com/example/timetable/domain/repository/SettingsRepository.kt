@@ -13,5 +13,6 @@ interface SettingsRepository {
 
     suspend fun setPureModeEnabled(enabled: Boolean)
 
-    suspend fun setActiveTimetable(timetableId: Long)
+    /** null 表示清空活跃课表。 */
+    suspend fun setActiveTimetable(timetableId: Long?)
 }

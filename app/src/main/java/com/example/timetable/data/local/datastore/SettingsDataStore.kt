@@ -52,7 +52,13 @@ class SettingsDataStore @Inject constructor(
             preferences[Keys.PURE_MODE] = updated.pureModeEnabled
             preferences[Keys.DEFAULT_ADVANCE] = updated.defaultReminderAdvanceMinutes
             preferences[Keys.ACTIVE_SEMESTER] = updated.activeSemesterId
-            preferences[Keys.ACTIVE_TIMETABLE] = updated.activeTimetableId
+            val activeTimetableId = updated.activeTimetableId
+            if (activeTimetableId != null) {
+                preferences[Keys.ACTIVE_TIMETABLE] = activeTimetableId
+            } else {
+                // null 语义用「键不存在」表达，而不是写入哨兵值
+                preferences.remove(Keys.ACTIVE_TIMETABLE)
+            }
         }
     }
 
@@ -62,7 +68,9 @@ class SettingsDataStore @Inject constructor(
         defaultReminderAdvanceMinutes =
             this[Keys.DEFAULT_ADVANCE] ?: ReminderRule.DEFAULT_ADVANCE_MINUTES,
         activeSemesterId = this[Keys.ACTIVE_SEMESTER] ?: 0L,
-        activeTimetableId = this[Keys.ACTIVE_TIMETABLE] ?: 0L,
+        // 骨架期可能写入过哨兵 0，只在读取侧归一为 null，不回写：
+        // 回写会在 Flow 上反复发射同一个值，导致下游无谓刷新。
+        activeTimetableId = this[Keys.ACTIVE_TIMETABLE]?.takeIf { it != 0L },
     )
 
     private object Keys {

@@ -11,6 +11,7 @@ import com.example.timetable.core.perf.TraceTags
 import com.example.timetable.navigation.AppNavHost
 import com.example.timetable.ui.theme.TimetableTheme
 import com.example.timetable.widget.WidgetDataObserver
+import com.example.timetable.widget.WidgetRefresher
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -25,6 +26,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var widgetDataObserver: WidgetDataObserver
+
+    @Inject
+    lateinit var widgetRefresher: WidgetRefresher
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,7 +46,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         // 观察窗口限定在前台：避免把一次 SQLCipher 开库塞进冷启动路径
-        widgetDataObserver.start(lifecycleScope)
+        widgetDataObserver.start(lifecycleScope) { widgetRefresher.refreshAll() }
     }
 
     override fun onStop() {

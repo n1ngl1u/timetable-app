@@ -1,6 +1,7 @@
 package com.example.timetable.domain.repository
 
 import com.example.timetable.domain.model.Course
+import com.example.timetable.domain.model.Semester
 import com.example.timetable.domain.model.Timetable
 import kotlinx.coroutines.flow.Flow
 
@@ -12,14 +13,21 @@ interface TimetableRepository {
 
     fun observeCourses(timetableId: Long): Flow<List<Course>>
 
-    /** 全库课程总数，供首页摘要与导入完成信号使用（避免为计数把整表读出来）。 */
-    fun observeTotalCourseCount(): Flow<Int>
+    /** 按课表计数；timetableId 为 null（无活跃课表）时直接返回 0，不查库。 */
+    fun observeCourseCount(timetableId: Long?): Flow<Int>
+
+    fun observeSemesters(): Flow<List<Semester>>
 
     suspend fun timetable(timetableId: Long): Timetable?
 
     suspend fun coursesOn(timetableId: Long, weekday: Int, week: Int): List<Course>
 
+    /** 整表替换：同一事务内先删该 timetableId 下的旧课程与节次，再写入新数据。 */
     suspend fun upsertTimetable(timetable: Timetable): Long
 
     suspend fun deleteTimetable(timetableId: Long)
+
+    suspend fun upsertSemester(semester: Semester): Long
+
+    suspend fun setActiveSemester(semesterId: Long)
 }

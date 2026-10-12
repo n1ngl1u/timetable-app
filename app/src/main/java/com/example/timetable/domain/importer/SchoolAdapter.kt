@@ -36,13 +36,14 @@ sealed interface LoginState {
 }
 
 /**
- * 导入请求；[payload] 非空时跳过网络抓取，直接解析。
+ * 导入请求。[timetableId] 为空时落到当前活跃课表；活跃课表也为空则新建并置为活跃。
  */
 data class ImportRequest(
     val schoolId: String,
     val payload: String? = null,
     val credentials: SchoolCredentials? = null,
     val fetchRequest: TimetableFetchRequest = TimetableFetchRequest(),
+    val timetableId: Long? = null,
     val tableName: String? = null,
     val startDate: LocalDate? = null,
 )

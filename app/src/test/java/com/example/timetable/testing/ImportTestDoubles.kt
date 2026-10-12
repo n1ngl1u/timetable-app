@@ -10,6 +10,7 @@ import com.example.timetable.domain.importer.SchoolSession
 import com.example.timetable.domain.importer.TimetableFetchRequest
 import com.example.timetable.domain.model.AppSettings
 import com.example.timetable.domain.model.Course
+import com.example.timetable.domain.model.Semester
 import com.example.timetable.domain.model.TimeSlot
 import com.example.timetable.domain.model.Timetable
 import com.example.timetable.domain.repository.SchoolRepository
@@ -21,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 class FakeTimeProvider(
@@ -53,7 +55,7 @@ class FakeSchoolAdapter(
     private val payload: String = SAMPLE_PAYLOAD,
     private val fetchError: Throwable? = null,
     private val parseError: Throwable? = null,
-    private val parsed: Timetable = SAMPLE_TIMETABLE,
+    var parsed: Timetable = SAMPLE_TIMETABLE,
 ) : SchoolAdapter {
 
     var fetchCount: Int = 0
@@ -139,6 +141,8 @@ class FakeTimetableRepository(
 
     private val timetables = MutableStateFlow<List<Timetable>>(emptyList())
 
+    private val semesters = MutableStateFlow<List<Semester>>(emptyList())
+
     var upserted: Timetable? = null
         private set
 
@@ -150,8 +154,16 @@ class FakeTimetableRepository(
     override fun observeCourses(timetableId: Long): Flow<List<Course>> =
         timetables.map { list -> list.firstOrNull { it.id == timetableId }?.courses.orEmpty() }
 
-    override fun observeTotalCourseCount(): Flow<Int> =
-        timetables.map { list -> list.sumOf { it.courses.size } }
+    override fun observeCourseCount(timetableId: Long?): Flow<Int> =
+        if (timetableId == null) {
+            flowOf(0)
+        } else {
+            timetables.map { list ->
+                list.firstOrNull { it.id == timetableId }?.courses?.size ?: 0
+            }
+        }
+
+    override fun observeSemesters(): Flow<List<Semester>> = semesters.asStateFlow()
 
     override suspend fun timetable(timetableId: Long): Timetable? =
         timetables.value.firstOrNull { it.id == timetableId }
@@ -162,6 +174,7 @@ class FakeTimetableRepository(
             ?.filter { it.weekday == weekday && it.isActiveInWeek(week) }
             .orEmpty()
 
+    /** 与 TimetableRepositoryImpl 一致：按 id 合并，同 id 视为整表替换。 */
     override suspend fun upsertTimetable(timetable: Timetable): Long {
         upsertError?.let { throw it }
         val current = timetables.value
@@ -174,7 +187,62 @@ class FakeTimetableRepository(
     override suspend fun deleteTimetable(timetableId: Long) {
         timetables.value = timetables.value.filterNot { it.id == timetableId }
     }
+
+    // 学期方法完整实现（非 UnsupportedOperationException）；本批无单测覆盖，学期模块接入后补。
+    override suspend fun upsertSemester(semester: Semester): Long {
+        val current = semesters.value
+        val stored = semester.copy(id = if (semester.id == 0L) nextId + current.size else semester.id)
+        semesters.value = current.filterNot { it.id == stored.id } + stored
+        return stored.id
+    }
+
+    override suspend fun setActiveSemester(semesterId: Long) {
+        semesters.value = semesters.value.map { it.copy(isActive = it.id == semesterId) }
+    }
 }
+
+class FakeSettingsRepository(
+    initial: AppSettings = AppSettings(),
+) : SettingsRepository {
+
+    private val state = MutableStateFlow(initial)
+
+    override val settings: Flow<AppSettings> = state.asStateFlow()
+
+    override suspend fun current(): AppSettings = state.value
+
+    override suspend fun update(transform: (AppSettings) -> AppSettings) {
+        state.value = transform(state.value)
+    }
+
+    override suspend fun setPureModeEnabled(enabled: Boolean) {
+        state.value = state.value.copy(pureModeEnabled = enabled)
+    }
+
+    override suspend fun setActiveTimetable(timetableId: Long?) {
+        state.value = state.value.copy(activeTimetableId = timetableId)
+    }
+}
+
+/** 构造一张带 N 门课的课表，供多课表切换类测试使用。 */
+fun populatedTimetable(
+    name: String,
+    courseCount: Int,
+    startDate: LocalDate = LocalDate.of(2026, 9, 7),
+): Timetable = Timetable(
+    tableName = name,
+    startDate = startDate,
+    timeSlots = listOf(TimeSlot(number = 1, startTime = "08:00", endTime = "08:45")),
+    courses = (1..courseCount).map { index ->
+        Course(
+            name = name + " 课程 " + index,
+            weekday = 1,
+            startSection = 1,
+            endSection = 1,
+            weeks = listOf(1),
+        )
+    },
+)
 
 val SAMPLE_PAYLOAD: String = """
     {
@@ -217,26 +285,3 @@ val SAMPLE_TIMETABLE: Timetable = Timetable(
         ),
     ),
 )
-
-class FakeSettingsRepository(
-    initial: AppSettings = AppSettings(),
-) : SettingsRepository {
-
-    private val state = MutableStateFlow(initial)
-
-    override val settings: Flow<AppSettings> = state.asStateFlow()
-
-    override suspend fun current(): AppSettings = state.value
-
-    override suspend fun update(transform: (AppSettings) -> AppSettings) {
-        state.value = transform(state.value)
-    }
-
-    override suspend fun setPureModeEnabled(enabled: Boolean) {
-        state.value = state.value.copy(pureModeEnabled = enabled)
-    }
-
-    override suspend fun setActiveTimetable(timetableId: Long) {
-        state.value = state.value.copy(activeTimetableId = timetableId)
-    }
-}

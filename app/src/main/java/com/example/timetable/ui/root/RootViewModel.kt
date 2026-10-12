@@ -12,6 +12,8 @@ import com.example.timetable.domain.importer.ImportResult
 import com.example.timetable.domain.repository.SettingsRepository
 import com.example.timetable.domain.repository.TimetableRepository
 import com.example.timetable.domain.usecase.ImportTimetableUseCase
+import com.example.timetable.domain.usecase.ObserveActiveTimetableUseCase
+import com.example.timetable.domain.usecase.TimetableSelectionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,16 +23,27 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-/** 首页摘要模型：只喂一行文本，不做正式 UI。 */
+/** UI 投影类型：只把渲染需要的字段带进状态，不把整个 domain Timetable 塞进来。 */
+data class TimetableOption(
+    val id: Long,
+    val name: String,
+)
+
+/** 首页摘要模型：正文只喂一行文本，切换入口在 TopAppBar。 */
 data class RootUiModel(
     val pureModeEnabled: Boolean,
+    val activeTimetableId: Long?,
+    val activeTimetableName: String?,
     val courseCount: Int,
+    val timetables: List<TimetableOption>,
 )
 
 @HiltViewModel
 class RootViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val timetableRepository: TimetableRepository,
+    private val observeActiveTimetable: ObserveActiveTimetableUseCase,
+    private val timetableSelection: TimetableSelectionUseCase,
     private val importTimetableUseCase: ImportTimetableUseCase,
     private val perfTracer: PerfTracer,
 ) : BaseViewModel() {
@@ -43,15 +56,33 @@ class RootViewModel @Inject constructor(
         viewModelScope.launch {
             combine(
                 settingsRepository.settings,
-                timetableRepository.observeTotalCourseCount(),
-            ) { settings, courseCount ->
-                RootUiModel(pureModeEnabled = settings.pureModeEnabled, courseCount = courseCount)
+                observeActiveTimetable.activeCourseCount,
+                timetableRepository.observeTimetables(),
+            ) { settings, courseCount, timetables ->
+                val options = timetables.map { TimetableOption(id = it.id, name = it.tableName) }
+                RootUiModel(
+                    pureModeEnabled = settings.pureModeEnabled,
+                    activeTimetableId = settings.activeTimetableId,
+                    activeTimetableName = options
+                        .firstOrNull { it.id == settings.activeTimetableId }
+                        ?.name,
+                    courseCount = courseCount,
+                    timetables = options,
+                )
             }.collect { model -> mutableState.value = UiState.Success(model) }
         }
     }
 
+    fun onTimetableSelected(timetableId: Long) {
+        viewModelScope.launch {
+            if (!timetableSelection.select(timetableId)) {
+                sendEvent(UiEvent.ShowMessage("课表不存在"))
+            }
+        }
+    }
+
     /**
-     * 导出入口只服务基准测试与最小接线：T0 在此打点，T1 在课表数据落库后
+     * 导入入口只服务基准测试与最小接线：T0 在此打点，T1 在课表数据落库后
      * 首次被数据流观察到时收口；失败时不收口，基准测试会因「未采集到打点」直接失败。
      */
     fun importPayload(payload: String) {
@@ -65,7 +96,7 @@ class RootViewModel @Inject constructor(
             )
             when (result) {
                 is ImportResult.Success -> {
-                    timetableRepository.observeTotalCourseCount().first { it > 0 }
+                    timetableRepository.observeCourseCount(result.timetableId).first { it > 0 }
                     perfTracer.end(TraceTags.IMPORT_FIRST_FRAME)
                     sendEvent(UiEvent.ShowMessage("导入成功：" + result.courseCount + " 门课程"))
                 }

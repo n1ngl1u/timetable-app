@@ -27,11 +27,16 @@ class BuildWidgetSnapshotUseCaseTest {
         timeProvider = FakeTimeProvider(today = today),
     )
 
-    private suspend fun seed(timetable: Timetable): Long = timetableRepository.upsertTimetable(timetable)
+    /** 多课表语义下必须显式指定活跃课表，不再有「回退第一张」的隐式行为。 */
+    private suspend fun seedActive(timetable: Timetable): Long {
+        val id = timetableRepository.upsertTimetable(timetable)
+        settingsRepository.setActiveTimetable(id)
+        return id
+    }
 
     @Test
     fun todayReturnsCoursesOfCurrentWeekdayAndWeek() = runTest {
-        seed(
+        seedActive(
             timetable(
                 courses = listOf(
                     course(name = "数据结构", weekday = 3, startSection = 1, endSection = 2, weeks = listOf(1, 2)),
@@ -49,7 +54,7 @@ class BuildWidgetSnapshotUseCaseTest {
 
     @Test
     fun courseNotActiveInCurrentWeekIsExcluded() = runTest {
-        seed(
+        seedActive(
             timetable(
                 courses = listOf(
                     course(name = "单周课", weekday = 3, weeks = listOf(1, 3, 5)),
@@ -67,19 +72,19 @@ class BuildWidgetSnapshotUseCaseTest {
 
     @Test
     fun weekIndexAdvancesEverySevenDays() = runTest {
-        seed(timetable(courses = emptyList()))
+        seedActive(timetable(courses = emptyList()))
         assertEquals(3, useCase(monday.plusDays(15)).today().weekIndex)
     }
 
     @Test
     fun weekIndexBeforeStartDateClampsToOne() = runTest {
-        seed(timetable(courses = emptyList()))
+        seedActive(timetable(courses = emptyList()))
         assertEquals(1, useCase(monday.minusDays(3)).today().weekIndex)
     }
 
     @Test
     fun weekReturnsSevenColumnsInWeekdayOrder() = runTest {
-        seed(timetable(courses = listOf(course(name = "周日课", weekday = 7, weeks = listOf(1)))))
+        seedActive(timetable(courses = listOf(course(name = "周日课", weekday = 7, weeks = listOf(1)))))
 
         val snapshot = useCase(monday).week()
 
@@ -104,7 +109,7 @@ class BuildWidgetSnapshotUseCaseTest {
 
     @Test
     fun timeTextPrefersTimeSlots() = runTest {
-        seed(
+        seedActive(
             timetable(
                 timeSlots = listOf(
                     TimeSlot(number = 1, startTime = "08:00", endTime = "08:45"),
@@ -119,7 +124,7 @@ class BuildWidgetSnapshotUseCaseTest {
 
     @Test
     fun timeTextFallsBackToSectionsWhenSlotsMissing() = runTest {
-        seed(
+        seedActive(
             timetable(
                 timeSlots = emptyList(),
                 courses = listOf(
@@ -134,29 +139,36 @@ class BuildWidgetSnapshotUseCaseTest {
     }
 
     @Test
-    fun activeTimetableIdWinsOverFirstTimetable() = runTest {
-        val first = seed(timetable(tableName = "第一张", courses = emptyList()))
-        val second = seed(
+    fun activeTimetableIdWinsOverOtherTimetables() = runTest {
+        timetableRepository.upsertTimetable(timetable(tableName = "第一张", courses = emptyList()))
+        val second = seedActive(
             timetable(
                 tableName = "第二张",
                 courses = listOf(course(name = "操作系统", weekday = 3, weeks = listOf(1))),
             ),
         )
-        settingsRepository.setActiveTimetable(second)
 
         val snapshot = useCase(monday.plusDays(2)).today()
 
         assertEquals("第二张", snapshot.tableName)
         assertEquals(listOf("操作系统"), snapshot.items.map { it.name })
-        assertTrue(first != second)
+        assertTrue(second > 0L)
     }
 
     @Test
-    fun fallsBackToFirstTimetableWhenActiveIdUnknown() = runTest {
-        seed(timetable(tableName = "唯一一张", courses = emptyList()))
+    fun unknownActiveIdYieldsEmptySnapshotInsteadOfFallingBack() = runTest {
+        timetableRepository.upsertTimetable(
+            timetable(
+                tableName = "存在的课表",
+                courses = listOf(course(name = "操作系统", weekday = 3, weeks = listOf(1))),
+            ),
+        )
         settingsRepository.setActiveTimetable(999L)
 
-        assertEquals("唯一一张", useCase(monday).today().tableName)
+        val snapshot = useCase(monday.plusDays(2)).today()
+
+        assertEquals("", snapshot.tableName)
+        assertFalse(snapshot.hasCourses)
     }
 
     private fun timetable(

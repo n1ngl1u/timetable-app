@@ -7,14 +7,19 @@ import com.example.timetable.domain.importer.ImportRequest
 import com.example.timetable.domain.importer.ImportResult
 import com.example.timetable.domain.importer.LoginState
 import com.example.timetable.domain.importer.SchoolCredentials
+import com.example.timetable.domain.model.Course
+import com.example.timetable.domain.model.Timetable
 import com.example.timetable.testing.FakeDispatcherProvider
 import com.example.timetable.testing.FakeSchoolAdapter
 import com.example.timetable.testing.FakeSchoolRegistry
 import com.example.timetable.testing.FakeSchoolRepository
+import com.example.timetable.testing.FakeSettingsRepository
 import com.example.timetable.testing.FakeTimeProvider
 import com.example.timetable.testing.FakeTimetableRepository
 import com.example.timetable.testing.SAMPLE_PAYLOAD
 import java.io.IOException
+import java.time.LocalDate
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -26,6 +31,8 @@ class ImportResultContractTest {
 
     private val credentials = SchoolCredentials(username = "u", password = "p")
 
+    private val settings = FakeSettingsRepository()
+
     private fun useCase(
         adapter: FakeSchoolAdapter = FakeSchoolAdapter(),
         schoolRepository: FakeSchoolRepository = FakeSchoolRepository(),
@@ -35,6 +42,7 @@ class ImportResultContractTest {
         schoolRegistry = registry,
         schoolRepository = schoolRepository,
         timetableRepository = timetableRepository,
+        settingsRepository = settings,
         perfTracer = PerfTracer(FakeTimeProvider()),
         dispatchers = FakeDispatcherProvider(),
     )
@@ -160,11 +168,73 @@ class ImportResultContractTest {
     }
 
     @Test
-    fun registryWithoutAdapterStillResolvesRegisteredOne() = runTest {
+    fun newImportBecomesActiveTimetable() = runTest {
         val adapter = FakeSchoolAdapter()
-        val result = useCase(adapter = adapter)
-            .invoke(ImportRequest(schoolId = adapter.schoolId, payload = SAMPLE_PAYLOAD))
-        assertNull(null)
-        assertTrue(result is ImportResult.Success)
+        assertNull(settings.current().activeTimetableId)
+
+        val result = useCase(adapter = adapter).invoke(ImportRequest(schoolId = adapter.schoolId))
+
+        val success = result as ImportResult.Success
+        assertEquals(success.timetableId, settings.current().activeTimetableId)
     }
+
+    @Test
+    fun importTargetsRequestedTimetableAndKeepsActiveUntouched() = runTest {
+        val adapter = FakeSchoolAdapter()
+        val repository = FakeTimetableRepository()
+        val existing = repository.upsertTimetable(timetable("已有课表", listOf(course("旧课"))))
+        settings.setActiveTimetable(existing)
+
+        val result = useCase(adapter = adapter, timetableRepository = repository).invoke(
+            ImportRequest(schoolId = adapter.schoolId, payload = SAMPLE_PAYLOAD, timetableId = existing),
+        )
+
+        val success = result as ImportResult.Success
+        assertEquals(existing, success.timetableId)
+        assertEquals("活跃课表不应因为定向导入而改变", existing, settings.current().activeTimetableId)
+    }
+
+    @Test
+    fun importIntoExistingTimetableReplacesPreviousCourses() = runTest {
+        val adapter = FakeSchoolAdapter()
+        val repository = FakeTimetableRepository()
+        val first = useCase(adapter = adapter, timetableRepository = repository)
+            .invoke(ImportRequest(schoolId = adapter.schoolId, payload = SAMPLE_PAYLOAD)) as ImportResult.Success
+        assertEquals(listOf("数据结构"), courseNames(repository, first.timetableId))
+
+        adapter.parsed = timetable("重新导入", listOf(course("高等数学"), course("大学英语")))
+        val second = useCase(adapter = adapter, timetableRepository = repository)
+            .invoke(
+                ImportRequest(
+                    schoolId = adapter.schoolId,
+                    payload = SAMPLE_PAYLOAD,
+                    timetableId = first.timetableId,
+                ),
+            ) as ImportResult.Success
+
+        assertEquals("必须落到同一张课表", first.timetableId, second.timetableId)
+        assertEquals(1, repository.observeTimetables().first().size)
+        assertEquals(
+            "整表替换：旧课程必须消失",
+            listOf("高等数学", "大学英语"),
+            courseNames(repository, second.timetableId),
+        )
+    }
+
+    private suspend fun courseNames(repository: FakeTimetableRepository, timetableId: Long): List<String> =
+        repository.timetable(timetableId)?.courses?.map { it.name }.orEmpty()
+
+    private fun timetable(name: String, courses: List<Course>): Timetable = Timetable(
+        tableName = name,
+        startDate = LocalDate.of(2026, 9, 7),
+        courses = courses,
+    )
+
+    private fun course(name: String): Course = Course(
+        name = name,
+        weekday = 2,
+        startSection = 1,
+        endSection = 2,
+        weeks = listOf(1),
+    )
 }

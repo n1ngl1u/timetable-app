@@ -24,7 +24,7 @@ class SettingsRepositoryImpl @Inject constructor(
         settingsDataStore.update { it.copy(pureModeEnabled = enabled) }
     }
 
-    override suspend fun setActiveTimetable(timetableId: Long) {
+    override suspend fun setActiveTimetable(timetableId: Long?) {
         settingsDataStore.update { it.copy(activeTimetableId = timetableId) }
     }
 }

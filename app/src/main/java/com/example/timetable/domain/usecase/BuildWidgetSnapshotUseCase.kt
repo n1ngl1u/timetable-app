@@ -12,11 +12,13 @@ import com.example.timetable.domain.repository.TimetableRepository
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
-import kotlinx.coroutines.flow.first
 
 /**
  * 把活跃课表组装成小组件快照。周次由 startDate 推导（startDate 为第 1 周周一），
  * 与 [Timetable.sectionsOf] 的过滤规则一致，两个小组件共用同一数据源。
+ *
+ * 活跃课表为空时返回空快照：多课表语义下不再回退到「第一张课表」，
+ * 否则删除活跃课表后小组件会静默显示另一张课表的内容。
  */
 class BuildWidgetSnapshotUseCase @Inject constructor(
     private val timetableRepository: TimetableRepository,
@@ -58,12 +60,8 @@ class BuildWidgetSnapshotUseCase @Inject constructor(
     }
 
     private suspend fun activeTimetable(): Timetable? {
-        val activeId = settingsRepository.current().activeTimetableId
-        if (activeId != 0L) {
-            timetableRepository.timetable(activeId)?.let { return it }
-        }
-        val fallbackId = timetableRepository.observeTimetables().first().firstOrNull()?.id ?: return null
-        return timetableRepository.timetable(fallbackId)
+        val activeId = settingsRepository.current().activeTimetableId ?: return null
+        return timetableRepository.timetable(activeId)
     }
 
     private fun weekIndexOf(timetable: Timetable, date: LocalDate): Int {
