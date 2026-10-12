@@ -27,15 +27,20 @@
 | 17 | 日历权限**拒绝**路径的真实行为 | 手工：系统设置撤销日历权限 → 触发同步 → 确认返回 `Skipped(PERMISSION_DENIED)` 且不崩溃、不抛 SecurityException | 撤销授权；**无法自动化**（`pm revoke` 会杀掉被测进程） | 未执行 |
 | 18 | Room MIGRATION_2_3（v2→v3，新建 calendar_event_links + 两个索引） | `app/src/androidTest/.../data/local/db/Migration2To3Test` | 无 | 未执行 |
 | 19 | 增量同步真机表现：改时间/地点/周次后事件随之更新而非重建；重导入整表后孤儿事件被 `pruneOrphanEvents` 清掉 | 手工：改课程 → 看系统日历；重新导入 → 看事件数不翻倍 | 授予日历权限；**RRULE 在系统日历 App 里的展开效果需肉眼确认** | 未执行 |
-| 20 | \`FakeCalendarRepository\` 的局限 | 说明项：该替身**不模拟 ContentResolver**，不产生真实日历事件，\`applyChanges\` 只记录计划；系统日历真实行为全部依赖第 15–19 项 | 无 | 已知边界 |
-| 21 | 导航切换：三个 tab 互跳 | \`app/src/androidTest/.../navigation/AppNavigationTest\` | 真机/模拟器 | 未执行 |
-| 22 | 月视图点击某天弹出单日详情 Sheet | \`.../ui/calendar/CalendarScreenTest#clickingDayOpensSheetWithIsoDateTitle\` | 真机/模拟器 | 未执行 |
-| 23 | 单日详情 Sheet 内容正确（有课/空态）与左滑切月 | \`.../CalendarScreenTest\` | 真机/模拟器 | 未执行 |
-| 24 | 删除课程后系统日历事件与 link 记录都消失 | \`app/src/androidTest/.../calendar/CalendarRepositoryDeleteEventsTest\` | 授予 READ/WRITE_CALENDAR | 未执行 |
-| 25 | 主题切换立即生效且不重建 Activity | \`app/src/androidTest/.../ui/settings/ThemeSwitchTest#switchingToLiquidGlassRepaintsWithoutRecreatingActivity\`（像素对比 + Activity identityHashCode 前后相同） | 真机/模拟器 | 未执行 |
-| 26 | 液态玻璃主题在真机上的 blur 实际效果与滚动帧率 | 手工：切到液态玻璃 → 观察光斑边缘过渡是否自然、滚动课表/月视图是否掉帧 | 真机；若掉帧，先将 \`blur(90.dp)\` 降到 48dp，仍不够再改为预合成渐变，**不得改用图片资源** | 未执行 |
+| 20 | `FakeCalendarRepository` 的局限 | 说明项：该替身**不模拟 ContentResolver**，不产生真实日历事件，`applyChanges` 只记录计划；系统日历真实行为全部依赖第 15–19 项 | 无 | 已知边界 |
+| 21 | 导航切换：三个 tab 互跳 | `app/src/androidTest/.../navigation/AppNavigationTest` | 真机/模拟器 | 未执行 |
+| 22 | 月视图点击某天弹出单日详情 Sheet | `.../ui/calendar/CalendarScreenTest#clickingDayOpensSheetWithIsoDateTitle` | 真机/模拟器 | 未执行 |
+| 23 | 单日详情 Sheet 内容正确（有课/空态）与左滑切月 | `.../CalendarScreenTest` | 真机/模拟器 | 未执行 |
+| 24 | 删除课程后系统日历事件与 link 记录都消失 | `app/src/androidTest/.../calendar/CalendarRepositoryDeleteEventsTest` | 授予 READ/WRITE_CALENDAR | 未执行 |
+| 25 | 主题切换立即生效且不重建 Activity | `app/src/androidTest/.../ui/settings/ThemeSwitchTest#switchingToLiquidGlassRepaintsWithoutRecreatingActivity`（像素对比 + Activity identityHashCode 前后相同） | 真机/模拟器 | 未执行 |
+| 26 | 液态玻璃主题在真机上的 blur 实际效果与滚动帧率 | 手工：切到液态玻璃 → 观察光斑边缘过渡是否自然、滚动课表/月视图是否掉帧 | 真机；若掉帧，先将 `blur(90.dp)` 降到 48dp，仍不够再改为预合成渐变，**不得改用图片资源** | 未执行 |
 | 27 | 系统深色模式切换时主题跟随 | 手工：设置里把「深色模式」设为跟随系统 → 切换系统深浅色 → 确认立即跟随且不闪白 | 真机/模拟器；本应用未声明 configChanges，uiMode 变化会重建 Activity | 未执行 |
-| 28 | 主题偏好经真实 DataStore 读写，非法值回落 | \`app/src/androidTest/.../data/local/datastore/SettingsThemePersistenceTest\` | 无 | 未执行 |
+| 28 | 主题偏好经真实 DataStore 读写，非法值回落 | `app/src/androidTest/.../data/local/datastore/SettingsThemePersistenceTest` | 无 | 未执行 |
+| 29 | 进入纯净模式后导航栏不渲染 | `app/src/androidTest/.../ui/puremode/PureModeTest#pureModeHidesNavigationBar` | 真机/模拟器 | 未执行 |
+| 30 | 双击返回退出纯净模式（1.5s 窗口） | `.../PureModeTest#doubleBackExitsPureMode` | 真机/模拟器 | 未执行 |
+| 31 | 系统栏隐藏与恢复 + 冷启动闪烁观察 | `.../PureModeTest#systemBarsAreHiddenAndRestored`；另需手工观察：纯净模式开启状态下冷启动，状态栏是否有一帧可见的闪烁（开关存 DataStore，首帧必然按默认可见渲染；本批刻意不引入第二份真源来消除它） | 真机 | 未执行 |
+| 32 | 进程重建后纯净模式保持（含系统栏重新隐藏） | `.../PureModeTest#pureModeSurvivesActivityRecreation` | 真机/模拟器 | 未执行 |
+| 33 | 返回键与 ModalBottomSheet 的优先级 | `.../PureModeTest#calendarSheetBackDismissStillWorksWhenPureModeIsOff`；说明项：**「纯净模式开启 + 抽屉打开」在 UI 上不可达**——打开纯净模式会直达课表页并隐藏导航栏，用户没有入口回到日历页。已覆盖可达的另一半：纯净模式关闭时外壳不注册 BackHandler，抽屉返回关闭照旧 | 真机/模拟器 | 未执行 |
 
 ## 孤儿事件清理指引
 

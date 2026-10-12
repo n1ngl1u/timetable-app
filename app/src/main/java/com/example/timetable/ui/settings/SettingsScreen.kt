@@ -88,6 +88,11 @@ fun SettingsScreen(
                 onDarkModePreferenceChange = viewModel::onDarkModePreferenceChange,
             )
             HorizontalDivider()
+            PureModeSection(
+                pureModeEnabled = model?.pureModeEnabled ?: false,
+                onPureModeChanged = viewModel::onPureModeChanged,
+            )
+            HorizontalDivider()
             Text(
                 text = stringResource(id = R.string.settings_calendar_section),
                 style = MaterialTheme.typography.titleSmall,

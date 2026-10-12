@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 data class SettingsUiModel(
+    val pureModeEnabled: Boolean,
     val themeId: ThemeId,
     val darkModePreference: DarkModePreference,
     val calendarSyncEnabled: Boolean,
@@ -69,6 +70,7 @@ class SettingsViewModel @Inject constructor(
                 lastSyncSummary,
             ) { settings, permissionGranted, summary ->
                 SettingsUiModel(
+                    pureModeEnabled = settings.pureModeEnabled,
                     themeId = ThemeId.fromStorage(settings.themeId),
                     darkModePreference = DarkModePreference.fromStorage(settings.darkModePreference),
                     calendarSyncEnabled = settings.calendarSyncEnabled,
@@ -78,6 +80,16 @@ class SettingsViewModel @Inject constructor(
             }.collect { model -> mutableState.value = UiState.Success(model) }
         }
         viewModelScope.launch { refreshPermissionState() }
+    }
+
+    /**
+     * 只写开关，不发任何消息 —— 首次进入提示由 PureModeViewModel 观察
+     * pureModeEnabled 的 false -> true 跳变后发出，保证提示只有一个发出点。
+     */
+    fun onPureModeChanged(enabled: Boolean) {
+        viewModelScope.launch {
+            runCatching { settingsRepository.setPureModeEnabled(enabled) }
+        }
     }
 
     /**

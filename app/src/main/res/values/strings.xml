@@ -63,6 +63,11 @@
     <string name="settings_theme_default">默认</string>
     <string name="settings_theme_time_of_day">时间动态</string>
     <string name="settings_theme_liquid_glass">液态玻璃</string>
+    <string name="pure_mode_section">纯净模式</string>
+    <string name="pure_mode_switch">纯净模式</string>
+    <string name="pure_mode_desc">隐藏导航栏与状态栏，双击返回退出</string>
+    <string name="pure_mode_hint_first_entry">双击返回键退出纯净模式</string>
+    <string name="pure_mode_confirm_exit">再按一次退出纯净模式</string>
     <string name="settings_dark_mode">深色模式</string>
     <string name="settings_dark_mode_follow">跟随系统</string>
     <string name="settings_dark_mode_light">浅色</string>

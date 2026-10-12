@@ -51,3 +51,13 @@
 
 **背景原因**：`calendar_event_links` 的外键是 `ON DELETE CASCADE`，先删课程会让 link 记录先消失，系统日历里的事件从此再也找不到归属，只能靠 `pruneOrphanEvents` 事后兜底。
 **硬规则**：任何删除入口都必须调 `DeleteCourseUseCase`（内部顺序：先 `CalendarRepository.deleteEventsForCourse`，后 `TimetableRepository.deleteCourse`）。禁止在 UI 或 ViewModel 里直接调 `TimetableRepository.deleteCourse`。
+
+### 10. 间隔计时一律用单调时钟
+
+**背景原因**：`epochMillis()` 取自墙钟，会被用户手动改、被网络校时。用它算「距上次操作多久」时，改一次系统时间就能让双击退出窗口、节流窗口算出错误结果——要么该退出时不退出，要么不该退出时直接退出。
+**硬规则**：任何「距上次操作多久」的判断走 `TimeProvider.elapsedRealtimeMillis()`（单调时钟）；`epochMillis()` 只用于「现在几点」与落库时间戳。跨时钟比较一律视为异常，按「全新一次操作」处理。
+
+### 11. 系统栏只能用 `WindowInsetsControllerCompat`
+
+**背景原因**：`View.systemUiVisibility` 在 API 30+ 已废弃，与 edge-to-edge 并存时 `hide` 会静默失效，表现为「代码执行了但状态栏还在」，且不抛任何异常。
+**硬规则**：隐藏/恢复系统栏一律 `WindowCompat.getInsetsController(window, decorView)`，并显式设置 `BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`，让用户仍能划出系统栏。

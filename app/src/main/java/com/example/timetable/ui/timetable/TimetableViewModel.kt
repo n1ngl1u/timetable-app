@@ -47,6 +47,7 @@ data class CourseRow(
 )
 
 data class TimetableUiModel(
+    /** 预留：纯净模式专属视觉接入点，当前仅 AppNavHost 层响应。 */
     val pureModeEnabled: Boolean,
     val activeTimetableId: Long?,
     val activeTimetableName: String?,

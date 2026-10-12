@@ -51,6 +51,7 @@ class SettingsDataStore @Inject constructor(
             preferences[Keys.THEME_ID] = updated.themeId
             preferences[Keys.DARK_MODE_PREFERENCE] = updated.darkModePreference
             preferences[Keys.PURE_MODE] = updated.pureModeEnabled
+            preferences[Keys.PURE_MODE_HINT_SHOWN] = updated.pureModeHintShown
             preferences[Keys.REMINDERS_ENABLED] = updated.remindersEnabled
             preferences[Keys.CALENDAR_SYNC_ENABLED] = updated.calendarSyncEnabled
             preferences[Keys.DEFAULT_ADVANCE] = updated.defaultReminderAdvanceMinutes
@@ -70,6 +71,7 @@ class SettingsDataStore @Inject constructor(
         darkModePreference = this[Keys.DARK_MODE_PREFERENCE]
             ?: AppSettings.DEFAULT_DARK_MODE_PREFERENCE,
         pureModeEnabled = this[Keys.PURE_MODE] ?: false,
+        pureModeHintShown = this[Keys.PURE_MODE_HINT_SHOWN] ?: false,
         remindersEnabled = this[Keys.REMINDERS_ENABLED] ?: false,
         calendarSyncEnabled = this[Keys.CALENDAR_SYNC_ENABLED] ?: false,
         defaultReminderAdvanceMinutes =
@@ -84,6 +86,7 @@ class SettingsDataStore @Inject constructor(
         val THEME_ID = stringPreferencesKey("theme_id")
         val DARK_MODE_PREFERENCE = stringPreferencesKey("dark_mode_preference")
         val PURE_MODE = booleanPreferencesKey("pure_mode")
+        val PURE_MODE_HINT_SHOWN = booleanPreferencesKey("pure_mode_hint_shown")
         val REMINDERS_ENABLED = booleanPreferencesKey("reminders_enabled")
         val CALENDAR_SYNC_ENABLED = booleanPreferencesKey("calendar_sync_enabled")
         val DEFAULT_ADVANCE = intPreferencesKey("default_reminder_advance_minutes")

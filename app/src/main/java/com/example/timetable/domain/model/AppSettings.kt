@@ -8,6 +8,8 @@ data class AppSettings(
     /** DarkModePreference.storageKey；非法值在 UI 层回落 FOLLOW_SYSTEM。 */
     val darkModePreference: String = DEFAULT_DARK_MODE_PREFERENCE,
     val pureModeEnabled: Boolean = false,
+    /** 首次进入纯净模式的一次性提示是否已经显示过。 */
+    val pureModeHintShown: Boolean = false,
     val remindersEnabled: Boolean = false,
     val calendarSyncEnabled: Boolean = false,
     val defaultReminderAdvanceMinutes: Int = ReminderRule.DEFAULT_ADVANCE_MINUTES,
