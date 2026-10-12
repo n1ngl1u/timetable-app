@@ -1,16 +1,28 @@
 package com.example.timetable.ui.root
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -22,7 +34,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.timetable.R
@@ -36,9 +50,13 @@ fun RootScreen(
     modifier: Modifier = Modifier,
     viewModel: RootViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val model = (state as? UiState.Success<*>)?.data as? RootUiModel
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) { viewModel.onPermissionStateMaybeChanged() }
 
     LaunchedEffect(autoImportPayload) {
         if (!autoImportPayload.isNullOrBlank()) {
@@ -51,7 +69,18 @@ fun RootScreen(
             when (event) {
                 is UiEvent.ShowMessage -> snackbarHostState.showSnackbar(event.text)
                 is UiEvent.Navigate -> Unit
-                is UiEvent.OpenSystemSettings -> Unit
+                is UiEvent.OpenSystemSettings -> {
+                    val intent = Intent(event.action).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        if (event.action == Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM) {
+                            data = Uri.fromParts("package", context.packageName, null)
+                        }
+                    }
+                    context.startActivity(intent)
+                }
+                is UiEvent.RequestNotificationPermission -> notificationPermissionLauncher.launch(
+                    android.Manifest.permission.POST_NOTIFICATIONS,
+                )
             }
         }
     }
@@ -73,26 +102,37 @@ fun RootScreen(
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
     ) { innerPadding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentAlignment = Alignment.Center,
         ) {
-            when (val current = state) {
-                UiState.Idle, UiState.Loading -> CircularProgressIndicator()
-                UiState.Empty -> Text(text = stringResource(id = R.string.root_empty))
-                is UiState.Error -> Text(
-                    text = stringResource(id = R.string.root_error) + ": " + current.error.message,
-                    color = MaterialTheme.colorScheme.error,
-                )
-                is UiState.Success<*> -> Text(text = summaryOf(current.data as? RootUiModel))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center,
+            ) {
+                when (val current = state) {
+                    UiState.Idle, UiState.Loading -> CircularProgressIndicator()
+                    UiState.Empty -> Text(text = stringResource(id = R.string.root_empty))
+                    is UiState.Error -> Text(
+                        text = stringResource(id = R.string.root_error) + ": " + current.error.message,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    is UiState.Success<*> -> Text(text = summaryOf(current.data as? RootUiModel))
+                }
             }
+            ReminderRow(
+                model = model,
+                onEnabledChange = viewModel::onRemindersEnabledChange,
+                onAdvanceChange = viewModel::onReminderAdvanceChange,
+            )
         }
     }
 }
 
-/** 正文摘要严格一行文本，不引入卡片 / 列表 / 分组标题。 */
+/** 摘要严格一行文本，不引入卡片 / 列表 / 分组标题。 */
 @Composable
 private fun summaryOf(model: RootUiModel?): String =
     if (model != null && model.courseCount > 0) {
@@ -100,6 +140,59 @@ private fun summaryOf(model: RootUiModel?): String =
     } else {
         stringResource(id = R.string.root_empty)
     }
+
+/** 提醒开关 + 提前量三档，单行控件；权限异常时只在必要时补一行提示。 */
+@Composable
+private fun ReminderRow(
+    model: RootUiModel?,
+    onEnabledChange: (Boolean) -> Unit,
+    onAdvanceChange: (Int) -> Unit,
+) {
+    if (model == null) return
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(id = R.string.reminder_section_title),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            model.advanceOptions.forEach { option ->
+                FilterChip(
+                    selected = option == model.reminderAdvanceMinutes,
+                    onClick = { onAdvanceChange(option) },
+                    label = { Text(text = option.toString()) },
+                    modifier = Modifier.padding(end = 4.dp),
+                )
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            Switch(
+                checked = model.remindersEnabled,
+                onCheckedChange = onEnabledChange,
+            )
+        }
+        if (model.showNotificationDisabledHint) {
+            Text(
+                text = stringResource(id = R.string.reminder_notifications_disabled),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+        }
+        if (model.showExactAlarmDisabledHint) {
+            Text(
+                text = stringResource(id = R.string.reminder_exact_alarm_disabled),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+        }
+    }
+}
 
 /** 课表切换入口：下拉列表，不做完整管理页，也不含删除。 */
 @Composable

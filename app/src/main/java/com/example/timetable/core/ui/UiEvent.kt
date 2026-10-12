@@ -10,4 +10,7 @@ sealed interface UiEvent {
     data class Navigate(val route: String) : UiEvent
 
     data class OpenSystemSettings(val action: String) : UiEvent
+
+    /** 仅在用户主动开启提醒时请求通知权限，冷启动不弹。 */
+    data object RequestNotificationPermission : UiEvent
 }

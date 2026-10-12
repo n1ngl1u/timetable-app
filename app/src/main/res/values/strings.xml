@@ -28,4 +28,11 @@
     <string name="widget_weekday_fri">周五</string>
     <string name="widget_weekday_sat">周六</string>
     <string name="widget_weekday_sun">周日</string>
+
+    <string name="reminder_channel_name">课前提醒</string>
+    <string name="reminder_channel_description">上课前按提前量提醒</string>
+    <string name="reminder_section_title">课前提醒</string>
+    <string name="reminder_advance_format">提前 %1$d 分钟</string>
+    <string name="reminder_notifications_disabled">通知被禁用，提醒只会记录不会弹出</string>
+    <string name="reminder_exact_alarm_disabled">未授予精确闹钟，已降级为不精确调度</string>
 </resources>

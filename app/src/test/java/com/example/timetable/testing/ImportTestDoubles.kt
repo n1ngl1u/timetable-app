@@ -10,10 +10,13 @@ import com.example.timetable.domain.importer.SchoolSession
 import com.example.timetable.domain.importer.TimetableFetchRequest
 import com.example.timetable.domain.model.AppSettings
 import com.example.timetable.domain.model.Course
+import com.example.timetable.domain.model.ReminderRule
+import com.example.timetable.domain.model.ReminderSchedule
 import com.example.timetable.domain.model.Semester
 import com.example.timetable.domain.model.TimeSlot
 import com.example.timetable.domain.model.Timetable
 import com.example.timetable.domain.repository.SchoolRepository
+import com.example.timetable.domain.repository.ReminderRepository
 import com.example.timetable.domain.repository.SettingsRepository
 import com.example.timetable.domain.repository.TimetableRepository
 import java.time.LocalDate
@@ -235,6 +238,7 @@ fun populatedTimetable(
     timeSlots = listOf(TimeSlot(number = 1, startTime = "08:00", endTime = "08:45")),
     courses = (1..courseCount).map { index ->
         Course(
+            id = index.toLong(),
             name = name + " 课程 " + index,
             weekday = 1,
             startSection = 1,
@@ -285,3 +289,36 @@ val SAMPLE_TIMETABLE: Timetable = Timetable(
         ),
     ),
 )
+
+class FakeReminderRepository : ReminderRepository {
+
+    private val rules = MutableStateFlow<List<ReminderRule>>(emptyList())
+
+    private var nextId = 1L
+
+    override fun observeRules(): Flow<List<ReminderRule>> = rules.asStateFlow()
+
+    override fun observeRulesForCourse(courseId: Long): Flow<List<ReminderRule>> =
+        rules.map { list -> list.filter { it.courseId == courseId } }
+
+    override suspend fun ruleForCourse(courseId: Long): ReminderRule? =
+        rules.value.firstOrNull { it.courseId == courseId }
+
+    /**
+     * 调度投影（reminders ⋈ courses ⋈ timetables ⟕ time_slots）是 Room JOIN 的真实语义，
+     * 本双件不持有课程/课表数据，无法如实重建；该路径由 ReminderScheduler 在设备侧验证。
+     */
+    override suspend fun enabledSchedules(): List<ReminderSchedule> = emptyList()
+
+    override suspend fun scheduleFor(ruleId: Long): ReminderSchedule? = null
+
+    override suspend fun upsertRule(rule: ReminderRule): Long {
+        val stored = if (rule.id == 0L) rule.copy(id = nextId++) else rule
+        rules.value = rules.value.filterNot { it.id == stored.id } + stored
+        return stored.id
+    }
+
+    override suspend fun deleteRule(ruleId: Long) {
+        rules.value = rules.value.filterNot { it.id == ruleId }
+    }
+}

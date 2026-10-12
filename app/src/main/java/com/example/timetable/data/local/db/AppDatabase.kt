@@ -27,8 +27,8 @@ import com.example.timetable.data.local.entity.TimetableEntity
         GradeEntity::class,
         GpaSnapshotEntity::class,
     ],
-    version = 1,
-    exportSchema = false,
+    version = 2,
+    exportSchema = true,
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {

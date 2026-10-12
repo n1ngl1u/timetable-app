@@ -107,6 +107,11 @@ android {
     }
 }
 
+ksp {
+    // 导出 Room schema：迁移可被真机测试校验，也为将来接入 MigrationTestHelper 留出条件
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 kotlin {
     compilerOptions {
         jvmTarget = JvmTarget.JVM_17
@@ -151,6 +156,7 @@ dependencies {
 
     implementation(libs.androidx.metrics.performance)
     implementation(libs.androidx.profileinstaller)
+    implementation(libs.androidx.work.runtime.ktx)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
