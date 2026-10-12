@@ -41,6 +41,16 @@
     <string name="tab_settings">设置</string>
 
     <string name="timetable_courses_empty">还没有课程，先导入一份课表</string>
+    <string name="timetable_import">导入课表</string>
+    <string name="import_sheet_title">导入课表</string>
+    <string name="import_from_file">从文件选择</string>
+    <string name="import_from_clipboard">从剪贴板读取</string>
+    <string name="import_manual_hint">手动粘贴 JSON</string>
+    <string name="import_manual_submit">导入</string>
+    <string name="import_overwrite_title">覆盖当前课表？</string>
+    <string name="import_overwrite_message">当前课表有 %1$d 门课程，导入后将全部替换为 %2$d 门新课程。此操作不可撤销。</string>
+    <string name="import_overwrite_confirm">覆盖导入</string>
+    <string name="import_overwrite_cancel">取消</string>
     <string name="timetable_course_delete">删除</string>
     <string name="timetable_delete_title">删除这门课？</string>
     <string name="timetable_delete_message">将同时删除系统日历中对应的课程事件。此操作不可撤销。</string>

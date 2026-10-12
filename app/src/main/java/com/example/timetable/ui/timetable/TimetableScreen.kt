@@ -18,6 +18,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -35,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -57,6 +60,12 @@ fun TimetableScreen(
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { viewModel.onPermissionStateMaybeChanged() }
+
+    // MIME 不限：JSON 在不同 provider 上会报 application/json / text/plain / octet-stream，
+    // 限定类型会让用户的文件在选择器里变灰。格式校验交给解析器，它给出的错误更准确。
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri -> uri?.let { viewModel.onFilePicked(it.toString()) } }
 
     LaunchedEffect(autoImportPayload) {
         if (!autoImportPayload.isNullOrBlank()) {
@@ -92,12 +101,24 @@ fun TimetableScreen(
             TopAppBar(
                 title = { Text(text = stringResource(id = R.string.app_name)) },
                 actions = {
-                    TimetableSwitcher(
-                        options = model?.timetables.orEmpty(),
-                        activeTimetableId = model?.activeTimetableId,
-                        activeTimetableName = model?.activeTimetableName,
-                        onSelected = viewModel::onTimetableSelected,
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = viewModel::onImportSheetOpened,
+                            enabled = model?.importing != true,
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_import),
+                                contentDescription = stringResource(id = R.string.timetable_import),
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TimetableSwitcher(
+                            options = model?.timetables.orEmpty(),
+                            activeTimetableId = model?.activeTimetableId,
+                            activeTimetableName = model?.activeTimetableName,
+                            onSelected = viewModel::onTimetableSelected,
+                        )
+                    }
                 },
             )
         },
@@ -121,6 +142,7 @@ fun TimetableScreen(
                 TimetableCourseList(
                     courses = model?.courses.orEmpty(),
                     onCourseLongPressed = viewModel::onCourseLongPressed,
+                    onImportClick = viewModel::onImportSheetOpened,
                     modifier = Modifier.weight(1f),
                 )
             }
@@ -138,6 +160,31 @@ fun TimetableScreen(
             course = pendingDelete,
             onConfirm = viewModel::onDeleteConfirmed,
             onDismiss = viewModel::onDeleteDismissed,
+        )
+    }
+
+    if (model?.importSheetVisible == true) {
+        ImportSheet(
+            manualPayload = model.manualPayload,
+            importing = model.importing,
+            onManualPayloadChanged = viewModel::onManualPayloadChanged,
+            onPickFile = {
+                viewModel.onImportSheetClosed()
+                filePickerLauncher.launch(arrayOf("*/*"))
+            },
+            onReadClipboard = viewModel::onImportFromClipboard,
+            onSubmitManual = viewModel::onManualImportSubmitted,
+            onDismiss = viewModel::onImportSheetClosed,
+        )
+    }
+
+    val overwritePrompt = model?.overwritePrompt
+    if (overwritePrompt != null) {
+        ImportOverwriteDialog(
+            existingCourseCount = overwritePrompt.existingCourseCount,
+            newCourseCount = overwritePrompt.newCourseCount,
+            onConfirm = viewModel::onOverwriteConfirmed,
+            onDismiss = viewModel::onOverwriteDismissed,
         )
     }
 }

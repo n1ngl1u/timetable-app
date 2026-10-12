@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
@@ -26,15 +27,26 @@ import com.example.timetable.R
 fun TimetableCourseList(
     courses: List<CourseRow>,
     onCourseLongPressed: (CourseRow) -> Unit,
+    onImportClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (courses.isEmpty()) {
-        Text(
-            text = stringResource(id = R.string.timetable_courses_empty),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Column(
             modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-        )
+            horizontalAlignment = Alignment.Start,
+        ) {
+            Text(
+                text = stringResource(id = R.string.timetable_courses_empty),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(
+                onClick = onImportClick,
+                modifier = Modifier.padding(top = 12.dp),
+            ) {
+                Text(text = stringResource(id = R.string.timetable_import))
+            }
+        }
         return
     }
     LazyColumn(modifier = modifier.fillMaxWidth()) {
