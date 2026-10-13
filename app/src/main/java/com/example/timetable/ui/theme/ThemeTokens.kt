@@ -15,7 +15,7 @@ data class ThemeElevation(
     val appBar: Dp,
 )
 
-/** 动效参数。主题切换过渡不使用这里的值，见 Theme.kt 的 THEME_TRANSITION_MILLIS。 */
+/** 动效参数。主题切换不做过渡动画，这里的值只服务普通 UI 动效。 */
 @Immutable
 data class ThemeMotion(
     val fastMillis: Int,

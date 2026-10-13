@@ -40,6 +40,7 @@
     <string name="tab_calendar">日历</string>
     <string name="tab_settings">设置</string>
 
+    <string name="timetable_missing_time_slots">此课表未提供节次时间，只显示节次号</string>
     <string name="timetable_courses_empty">还没有课程，先导入一份课表</string>
     <string name="timetable_import">导入课表</string>
     <string name="import_sheet_title">导入课表</string>
@@ -90,6 +91,4 @@
     <string name="settings_calendar_synced">已同步：新增 %1$d，更新 %2$d，删除 %3$d</string>
     <string name="settings_calendar_nothing_to_sync">没有可同步的课程</string>
     <string name="settings_calendar_cleared">已移除系统日历中的课程事件</string>
-    <string name="settings_other_section">其他</string>
-    <string name="settings_other_placeholder">主题、纯净模式与加密设置将在后续模块提供</string>
 </resources>

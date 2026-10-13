@@ -134,6 +134,14 @@ fun TimetableScreen(
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
+            if (model?.missingTimeSlots == true) {
+                Text(
+                    text = stringResource(id = R.string.timetable_missing_time_slots),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                )
+            }
             if (state is UiState.Loading || state is UiState.Idle) {
                 Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()

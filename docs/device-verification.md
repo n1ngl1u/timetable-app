@@ -32,7 +32,7 @@
 | 22 | 月视图点击某天弹出单日详情 Sheet | `.../ui/calendar/CalendarScreenTest#clickingDayOpensSheetWithIsoDateTitle` | 真机/模拟器 | 未执行 |
 | 23 | 单日详情 Sheet 内容正确（有课/空态）与左滑切月 | `.../CalendarScreenTest` | 真机/模拟器 | 未执行 |
 | 24 | 删除课程后系统日历事件与 link 记录都消失 | `app/src/androidTest/.../calendar/CalendarRepositoryDeleteEventsTest` | 授予 READ/WRITE_CALENDAR | 未执行 |
-| 25 | 主题切换立即生效且不重建 Activity | `app/src/androidTest/.../ui/settings/ThemeSwitchTest#switchingToLiquidGlassRepaintsWithoutRecreatingActivity`（像素对比 + Activity identityHashCode 前后相同） | 真机/模拟器 | 未执行 |
+| 25 | 主题切换立即生效且不重建 Activity | `app/src/androidTest/.../ui/settings/ThemeSwitchTest#switchingToLiquidGlassRepaintsWithoutRecreatingActivity`（像素对比 + Activity identityHashCode 前后相同 + 冻结时钟两帧内变色） | 真机/模拟器 | 未执行 |
 | 26 | 液态玻璃主题在真机上的 blur 实际效果与滚动帧率 | 手工：切到液态玻璃 → 观察光斑边缘过渡是否自然、滚动课表/月视图是否掉帧 | 真机；若掉帧，先将 `blur(90.dp)` 降到 48dp，仍不够再改为预合成渐变，**不得改用图片资源** | 未执行 |
 | 27 | 系统深色模式切换时主题跟随 | 手工：设置里把「深色模式」设为跟随系统 → 切换系统深浅色 → 确认立即跟随且不闪白 | 真机/模拟器；本应用未声明 configChanges，uiMode 变化会重建 Activity | 未执行 |
 | 28 | 主题偏好经真实 DataStore 读写，非法值回落 | `app/src/androidTest/.../data/local/datastore/SettingsThemePersistenceTest` | 无 | 未执行 |
@@ -44,6 +44,7 @@
 | 34 | 真实 Keystore 上的 StrongBox 路径 | `app/src/androidTest/.../data/crypto/KeystoreFieldCipherTest#strongBoxPathIsUsedWhenSupported`（断言 `KeyInfo.securityLevel == SECURITY_LEVEL_STRONGBOX`）；**设备不支持 StrongBox 时 `Assume` 跳过，需在报告里记录该机是否支持** | 真机，且设备具备 StrongBox | 未执行 |
 | 35 | 主密钥持久化：换一个 KeyStore 实例仍能取到同一密钥并解密旧密文 | `app/src/androidTest/.../data/crypto/SecurePrefsPersistenceTest#credentialsWrittenByOneInstanceAreReadableByAnother`；**说明**：这是近似验证（证明密钥落在 Keystore 而非进程内存），真正的「杀进程重启后仍可解密」无法在 instrumented 测试里完成（force-stop 会带走 instrumentation），需手工：存凭据 → 上滑杀掉进程 → 重开应用 → 确认仍能读出 | 真机 | 未执行 |
 | 36 | 导入入口：TopAppBar 图标打开面板，手动粘贴合法 JSON 可完成导入；缺字段时报出字段路径 | `app/src/androidTest/.../ui/timetable/ImportSheetTest` | 真机/模拟器；用例会先处理可能出现的覆盖确认弹窗 | 未执行 |
+| 37 | 课表页课程行时间显示：有节次时间时显示「第 1-2 节（08:00-09:40）」，缺 timeSlots 时显示「第 1-2 节」并在摘要行下出现「此课表未提供节次时间，只显示节次号」 | 手工目视：导入一份带 timeSlots 的 JSON 与一份不带 timeSlots 的 JSON，各看一次列表；JVM 侧逻辑由 `CourseTimeTextTest` 覆盖 | 真机/模拟器 | 未执行 |
 
 ## 孤儿事件清理指引
 

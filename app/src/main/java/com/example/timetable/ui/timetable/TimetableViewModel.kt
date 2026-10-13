@@ -64,6 +64,8 @@ data class TimetableUiModel(
     val exactAlarmsAllowed: Boolean,
     val notificationsAllowed: Boolean,
     val courses: List<CourseRow>,
+    /** 有课程但一个节次时间都没有：数据本身缺 timeSlots，不是 App 故障。 */
+    val missingTimeSlots: Boolean,
     val pendingDelete: CourseRow?,
     val importSheetVisible: Boolean,
     val importing: Boolean,
@@ -236,6 +238,7 @@ class TimetableViewModel @Inject constructor(
         importUi: ImportUiState,
     ): TimetableUiModel {
         val options = header.timetables.map { TimetableOption(id = it.id, name = it.tableName) }
+        val courseRows = timetable?.courses.orEmpty().map { it.toRow(timetable) }
         return TimetableUiModel(
             pureModeEnabled = header.settings.pureModeEnabled,
             activeTimetableId = header.settings.activeTimetableId,
@@ -249,7 +252,9 @@ class TimetableViewModel @Inject constructor(
             advanceOptions = ReminderRule.ADVANCE_OPTIONS,
             exactAlarmsAllowed = header.permissions.exactAlarmsAllowed,
             notificationsAllowed = header.permissions.notificationsAllowed,
-            courses = timetable?.courses.orEmpty().map { it.toRow(timetable) },
+            courses = courseRows,
+            // 空课表不提示：新用户还没导入任何东西，提示只会造成困惑
+            missingTimeSlots = courseRows.isNotEmpty() && timetable?.timeSlots.isNullOrEmpty(),
             pendingDelete = pending,
             importSheetVisible = importUi.sheetVisible,
             importing = importUi.importing,
@@ -266,17 +271,12 @@ class TimetableViewModel @Inject constructor(
         sectionText = sectionTextOf(timetable, this),
     )
 
-    private fun sectionTextOf(timetable: Timetable?, course: Course): String {
-        val start = timetable?.timeSlots?.firstOrNull { it.number == course.startSection }?.startTime
-        val end = timetable?.timeSlots?.firstOrNull { it.number == course.endSection }?.endTime
-        return if (!start.isNullOrBlank() && !end.isNullOrBlank()) {
-            start + "-" + end
-        } else if (course.startSection == course.endSection) {
-            "第 " + course.startSection + " 节"
-        } else {
-            "第 " + course.startSection + "-" + course.endSection + " 节"
-        }
-    }
+    /** 文案拼装抽到 [CourseTimeText]，好让它能在 JVM 上被测 —— 本类依赖 Android 类，构造不出来。 */
+    private fun sectionTextOf(timetable: Timetable?, course: Course): String = CourseTimeText.of(
+        timeSlots = timetable?.timeSlots.orEmpty(),
+        startSection = course.startSection,
+        endSection = course.endSection,
+    )
 
     fun onImportSheetOpened() {
         importState.value = importState.value.copy(sheetVisible = true)
